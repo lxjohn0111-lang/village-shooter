@@ -126,7 +126,8 @@ export class Combat {
       if (isPlayer) target.damage(amount * (owner === target ? 0.6 : 0.8), { x, y, z }, 'explosion');
       else { _d.set(cx - x, 0.4, cz - z).normalize(); const killed = target.damage(amount, owner, 'explosion', _d); if (killed && owner === G.player && G.mode) G.mode.onExplosiveKill(target); }
     };
-    if (G.actors) for (const a of G.actors.list.slice()) { if (!a.dead && !(team >= 0 && a.team === team)) hurt(a.pos, a.height, a, false); }
+    const friendly = owner === G.player || (owner && owner.team === 0);
+    if (G.actors) for (const a of G.actors.list.slice()) { if (!a.dead && !(team >= 0 && a.team === team) && !(friendly && a.team === 0)) hurt(a.pos, a.height, a, false); }
     const p = G.player;
     if (p && !p.dead && team !== 0) hurt(p.pos, p.height, p, true); else if (p && !p.dead && owner === p) hurt(p.pos, p.height, p, true);
     if (p) { const d = Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z); p.shake = Math.min(1.6, p.shake + clamp(radius * 3.5 / (d + 2), 0, 1.4)); if (d < radius * 2) G.r3.fx.flash = Math.max(G.r3.fx.flash, 0.5 * (1 - d / (radius * 2))); }

@@ -40,6 +40,7 @@ function mats() {
   MAT.dot = new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false });
   MAT.green = new S({ color: 0x3b4a33, metalness: 0.3, roughness: 0.6 });
   MAT.red = new S({ color: 0x7a1c14, metalness: 0.3, roughness: 0.5 });
+  for (const k of ['metal', 'steel', 'poly', 'tan', 'wood', 'glove', 'sleeve', 'green', 'red']) { MAT[k].emissive.copy(MAT[k].color); MAT[k].emissiveIntensity = 0.1; }
   return MAT;
 }
 const GEO = { box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(1, 1, 1, 14), cyl6: new THREE.CylinderGeometry(1, 1, 1, 6), sph: new THREE.SphereGeometry(1, 12, 8) };
@@ -78,7 +79,7 @@ function buildModel(kind) {
     box(g, M_.lens, 0.036, 0.036, 0.002, 0, 0.115, -0.1);
     const dot = new THREE.Mesh(GEO.sph, M_.dot); dot.scale.setScalar(0.0022); dot.position.set(0, 0.115, -0.101); g.add(dot);
     box(g, M_.metal, 0.008, 0.03, 0.008, 0, 0.085, -0.45 - 0.2 * L);
-    o.adsY = -0.115; o.adsZ = -0.16; o.eject.set(0.035, 0.05, -0.06);
+    o.adsY = -0.115; o.adsZ = -0.33; o.eject.set(0.035, 0.05, -0.06);
     o.lh = hand(g, 0, -0.012, -0.24 - 0.1 * L, true); o.rh = hand(g, 0.002, -0.05, 0.035, false);
   } else if (kind === 'pistol') {
     box(g, M_.metal, 0.03, 0.036, 0.19, 0, 0.045, -0.06); box(g, M_.poly, 0.028, 0.03, 0.13, 0, 0.014, -0.035);
@@ -86,14 +87,14 @@ function buildModel(kind) {
     cylZ(g, M_.steel, 0.008, 0.02, 0, 0.045, -0.165); box(g, M_.metal, 0.006, 0.012, 0.008, 0, 0.068, -0.145); box(g, M_.metal, 0.02, 0.012, 0.008, 0, 0.068, 0.025);
     box(g, M_.metal, 0.008, 0.02, 0.04, 0, -0.005, -0.03);
     o.bolt = box(g, M_.steel, 0.031, 0.02, 0.06, 0, 0.052, 0.0);
-    o.muzzle.set(0, 0.045, -0.18); o.adsY = -0.073; o.adsZ = -0.28; o.hip = [0.16, -0.15, -0.5]; o.eject.set(0.02, 0.06, -0.03);
+    o.muzzle.set(0, 0.045, -0.18); o.adsY = -0.073; o.adsZ = -0.4; o.hip = [0.16, -0.15, -0.5]; o.eject.set(0.02, 0.06, -0.03);
     o.rh = hand(g, 0.002, -0.05, 0.03, false); o.lh = hand(g, -0.02, -0.07, 0.03, true);
   } else if (kind === 'shotgun') {
     box(g, M_.metal, 0.05, 0.07, 0.24, 0, 0.03, -0.07); cylZ(g, M_.steel, 0.014, 0.56, 0, 0.05, -0.47); cylZ(g, M_.metal, 0.013, 0.42, 0, 0.018, -0.4);
     o.pump = box(g, M_.wood, 0.05, 0.05, 0.16, 0, 0.018, -0.36); for (let i = 0; i < 5; i++) box(o.pump, M_.metal, 1.02, 0.3, 0.05, 0, -0.2, -0.4 + i * 0.2);
     box(g, M_.wood, 0.042, 0.062, 0.26, 0, 0.005, 0.17, -0.1); box(g, M_.wood, 0.038, 0.09, 0.05, 0, -0.035, 0.05, 0.35); box(g, M_.poly, 0.046, 0.1, 0.02, 0, -0.01, 0.305);
     box(g, M_.brass, 0.008, 0.01, 0.008, 0, 0.068, -0.74); box(g, M_.metal, 0.012, 0.03, 0.07, 0, -0.012, -0.02);
-    o.muzzle.set(0, 0.05, -0.76); o.adsY = -0.074; o.adsZ = -0.14; o.eject.set(0.035, 0.04, -0.05);
+    o.muzzle.set(0, 0.05, -0.76); o.adsY = -0.074; o.adsZ = -0.3; o.eject.set(0.035, 0.04, -0.05);
     o.lh = hand(g, 0, -0.02, -0.36, true); o.rh = hand(g, 0.002, -0.05, 0.06, false);
   } else if (kind === 'sniper') {
     box(g, M_.green, 0.05, 0.07, 0.3, 0, 0.03, -0.06); box(g, M_.green, 0.046, 0.055, 0.34, 0, 0.022, -0.38); cylZ(g, M_.steel, 0.012, 0.6, 0, 0.045, -0.62); cylZ(g, M_.metal, 0.02, 0.09, 0, 0.045, -0.95);
@@ -111,7 +112,7 @@ function buildModel(kind) {
     box(g, M_.poly, 0.036, 0.09, 0.045, 0, -0.045, 0.03, 0.3); box(g, M_.poly, 0.034, 0.08, 0.04, 0, -0.03, -0.32, -0.2);
     box(g, M_.metal, 0.03, 0.01, 0.1, 0, 0.085, -0.3); box(g, M_.metal, 0.006, 0.05, 0.006, 0, 0.11, -0.34); box(g, M_.metal, 0.02, 0.03, 0.006, 0, 0.1, -0.26);
     o.mag = new THREE.Group(); g.add(o.mag);
-    o.muzzle.set(0, 0.04, -0.6); o.adsY = -0.11; o.adsZ = -0.12; o.lh = hand(g, 0, -0.07, -0.32, true); o.rh = hand(g, 0.002, -0.05, 0.035, false);
+    o.muzzle.set(0, 0.04, -0.6); o.adsY = -0.11; o.adsZ = -0.3; o.lh = hand(g, 0, -0.07, -0.32, true); o.rh = hand(g, 0.002, -0.05, 0.035, false);
   } else if (kind === 'rocket') {
     cylZ(g, M_.green, 0.045, 0.95, 0.0, 0.07, -0.15); cylZ(g, M_.metal, 0.055, 0.1, 0, 0.07, 0.33, 0.055); cylZ(g, M_.metal, 0.05, 0.05, 0, 0.07, -0.63);
     o.mag = new THREE.Group(); g.add(o.mag); const wh = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 10), mats().red); wh.rotation.x = -Math.PI / 2; wh.position.set(0, 0.07, -0.72); o.mag.add(wh); cylZ(o.mag, M_.steel, 0.03, 0.1, 0, 0.07, -0.6);
@@ -352,7 +353,7 @@ export class WeaponSys {
     this.rig.position.set(x, y, z); this.rig.rotation.set(rx, ry, rz);
     this.flashT -= dt; this.flash.visible = this.flashT > 0 && a < 0.92 || (this.flashT > 0 && !d.scope);
     this.holder.visible = !(d.scope && a > 0.9) && !player.dead;
-    { const f = Math.tan(27 * Math.PI / 180) / Math.tan(this.camera.fov * Math.PI / 360) * (1 + a * 0.12); this.holder.scale.set(0.42 * Math.min(1, f), 0.42 * Math.min(1, f), 0.42); }
+    { const f = Math.tan(27 * Math.PI / 180) / Math.tan(this.camera.fov * Math.PI / 360) * (1 + a * 0.05); this.holder.scale.set(0.42 * Math.min(1, f), 0.42 * Math.min(1, f), 0.42); }
     this.spread = lerp(d.hip * (1 + clamp(player.speed / 6, 0, 1) * 1.6) * (player.crouch ? 0.7 : 1) + this.heat * d.hip * 0.9, d.ads, a);
   }
 

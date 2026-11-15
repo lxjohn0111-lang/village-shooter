@@ -138,10 +138,10 @@ input[type=text]{background:rgba(0,0,0,.4);border:1px solid var(--line);color:va
 #banner .bt{font-size:46px;font-weight:800;letter-spacing:.22em;text-shadow:0 0 30px currentColor,0 2px 4px #000}
 #banner .bs{font-size:14px;letter-spacing:.3em;color:#ddd;margin-top:4px}
 #streak{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:22px;font-weight:800;letter-spacing:.2em;color:var(--gold);opacity:0;transition:opacity .3s}
-#toast{position:absolute;left:50%;top:70%;transform:translateX(-50%);font-size:15px;letter-spacing:.16em;opacity:0;transition:opacity .25s;white-space:nowrap}
+#toast{position:absolute;left:50%;top:63%;transform:translateX(-50%);font-size:15px;letter-spacing:.16em;opacity:0;transition:opacity .25s;white-space:nowrap}
 #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:13px;letter-spacing:.14em;background:rgba(0,0,0,.5);padding:5px 12px;border:1px solid var(--line);display:none}
 #prompt b{color:var(--em)}
-#subtitle{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);width:min(760px,80vw);text-align:center;opacity:0;transition:opacity .3s;font-family:var(--bf)}
+#subtitle{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:min(700px,54vw);text-align:center;opacity:0;transition:opacity .3s;font-family:var(--bf)}
 #subtitle.on{opacity:1}
 #subtitle .who{font-family:var(--hf);font-size:12px;letter-spacing:.3em;color:var(--em)}
 #subtitle .txt{font-size:17px;line-height:1.45;background:rgba(0,0,0,.42);padding:6px 14px;display:inline-block;margin-top:3px}

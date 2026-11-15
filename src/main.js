@@ -34,7 +34,6 @@ window.G = G;
 async function boot() {
   progress(0.05, 'Contacting the valley…');
   G.audio = new AudioSys();
-  SDK.loadingStart();
   await SDK.init();
   SDK.loadingStart();
   progress(0.15, 'Opening the ledgers…');

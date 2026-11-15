@@ -509,7 +509,7 @@ export class World {
       } else if (dv[i3 + 1] < -6 && r > 0.07) {
         // heavy falling masonry hurts whoever is underneath
         if (actors) for (const a of actors) {
-          if (a.dead) continue;
+          if (a.dead || a.T.civilian) continue;
           if (Math.abs(a.pos.x - x) < 0.45 && Math.abs(a.pos.z - z) < 0.45 && y > a.pos.y + 0.8 && y < a.pos.y + 2.1) { a.damage(18 + r * 160, null, 'debris'); dv[i3 + 1] *= 0.4; }
         }
         if (player && !player.dead && Math.abs(player.pos.x - x) < 0.4 && Math.abs(player.pos.z - z) < 0.4 && y > player.pos.y + 1.0 && y < player.pos.y + 2.1) { player.damage(6 + r * 60, null, 'debris'); dv[i3 + 1] *= 0.4; }
