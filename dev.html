@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{width:100%;height:100%;display:block}</style>
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/addons/"}}</script></head>
+<body><canvas id="c"></canvas><script type="module">
+import * as THREE from 'three';
+import { G } from './src/util.js';
+import { makeNoiseTexture } from './src/textures.js';
+import { Renderer3D } from './src/render.js';
+import { World } from './src/world.js';
+import { Terrain } from './src/terrain.js';
+import { genVillage, buildVillage, starterVillage } from './src/blueprints.js';
+const q = new URLSearchParams(location.search);
+G.noiseTex = makeNoiseTexture();
+G.settings = { quality: +(q.get('q') || 1) };
+const R = G.r3 = new Renderer3D(document.getElementById('c'));
+R.setQuality(G.settings.quality);
+const world = G.world = new World(R.scene);
+const terrain = G.terrain = new Terrain(R.scene);
+const lvl = +(q.get('lvl') || 8);
+const v = lvl === 0 ? starterVillage() : genVillage(+(q.get('seed') || 5), lvl);
+const t0 = performance.now();
+const rt = buildVillage(world, v, { tint: 0x2a5fa8 });
+terrain.updateSplat(world, rt.paths);
+R.lampSources = rt.lamps;
+R.setEnv(q.get('env') || 'golden');
+const cam = (q.get('cam') || '30,14,46,0,3,0').split(',').map(Number);
+R.camera.position.set(cam[0], cam[1], cam[2]); R.camera.lookAt(cam[3], cam[4], cam[5]);
+R.camera.fov = +(q.get('fov') || 60); R.camera.updateProjectionMatrix();
+window.G = G; window.THREE = THREE;
+let n = 0;
+function loop() { world.update(0.016); terrain.update(0.016); R.update(0.016); R.render(); n++; if (n === 3) { window.READY = true; console.log('pieces', world.alive, 'build ms', (performance.now() - t0) | 0); } if (n < +(q.get('frames') || 4)) requestAnimationFrame(loop); else console.log('frame ms', ((performance.now() - t0) / n) | 0); }
+window.STEP = (k = 1) => { for (let i = 0; i < k; i++) { world.update(0.016); terrain.update(0.016); R.update(0.016); } R.render(); };
+loop();
+</script></body></html>
