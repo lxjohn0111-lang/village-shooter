@@ -185,9 +185,9 @@ function onUnlock() {
 }
 function onKey(code, e) {
   if (G.state === 'build') {
-    if (code === 'Tab') { if (Input.locked) document.exitPointerLock(); else { Input.wantLock = true; Input.lock(); } }
+    if (code === 'Tab') { if (Input.locked) Input.release(); else { Input.wantLock = true; Input.lock(); } }
     if (code === 'Escape' && !Input.locked) { if (G.ui.modalKind === 'pause') G.ui.closeModal(); else G.ui.showPause(); }
-  } else if (G.state === 'play' && code === 'KeyP' && Input.locked) Input.unlock();
+  } else if (G.state === 'play' && code === 'KeyP' && Input.locked) Input.release();
 }
 
 // ---------------------------------------------------------------------- main loop

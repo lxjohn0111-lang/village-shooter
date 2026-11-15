@@ -3,7 +3,7 @@ import { G } from './util.js';
 
 export const Input = {
   keys: {}, pressed: {}, released: {}, mdx: 0, mdy: 0, wheel: 0, buttons: [false, false, false], bPressed: [false, false, false], bReleased: [false, false, false],
-  locked: false, wantLock: false,
+  locked: false, wantLock: false, virtual: false, noLock: false,
   init(canvas) {
     this.canvas = canvas;
     window.addEventListener('keydown', (e) => {
@@ -11,10 +11,11 @@ export const Input = {
       if (!this.keys[e.code]) this.pressed[e.code] = true;
       this.keys[e.code] = true;
       if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Quote', 'F1', 'F3'].includes(e.code) || (e.ctrlKey && ['KeyS', 'KeyD', 'KeyW', 'KeyZ'].includes(e.code))) e.preventDefault();
+      if (e.code === 'Escape' && this.virtual) this.release();
       if (G.onKey) G.onKey(e.code, e);
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; this.released[e.code] = true; });
-    window.addEventListener('blur', () => { this.keys = {}; this.buttons = [false, false, false]; });
+    window.addEventListener('blur', () => { this.keys = {}; this.buttons = [false, false, false]; if (this.virtual) this.release(); });
     canvas.addEventListener('mousedown', (e) => {
       if (G.audio) G.audio.resume();
       if (this.wantLock && !this.locked) { this.lock(); return; }
@@ -30,13 +31,24 @@ export const Input = {
       if (!this.locked) { this.buttons = [false, false, false]; if (G.onPointerUnlock) G.onPointerUnlock(); }
       else if (G.onPointerLock) G.onPointerLock();
     });
-    document.addEventListener('pointerlockerror', () => { this.locked = false; });
+    document.addEventListener('pointerlockerror', () => this.fallback());
   },
   lock() {
     if (this.locked) return;
-    try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
+    if (this.noLock) { this.setVirtual(true); return; }
+    try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => this.fallback()); } catch (e) { this.fallback(); }
   },
-  unlock() { this.wantLock = false; if (document.pointerLockElement) document.exitPointerLock(); },
+  // when the page's frame refuses pointer lock, steer with plain mouse movement over the canvas instead
+  fallback() { if (this.locked && !this.virtual) return; this.noLock = true; this.setVirtual(true); },
+  setVirtual(on) {
+    if (this.virtual === on) return;
+    this.virtual = on; this.locked = on; this.canvas.style.cursor = on ? 'none' : '';
+    if (on) { if (G.onPointerLock) G.onPointerLock(); }
+    else { this.buttons = [false, false, false]; if (G.onPointerUnlock) G.onPointerUnlock(); }
+  },
+  // drop the mouse but keep wanting it back on the next click
+  release() { if (this.virtual) this.setVirtual(false); else if (document.pointerLockElement) document.exitPointerLock(); },
+  unlock() { this.wantLock = false; this.release(); },
   endFrame() {
     this.pressed = {}; this.released = {}; this.mdx = 0; this.mdy = 0; this.wheel = 0;
     this.bPressed[0] = this.bPressed[1] = this.bPressed[2] = false; this.bReleased[0] = this.bReleased[1] = this.bReleased[2] = false;
