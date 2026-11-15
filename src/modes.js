@@ -41,6 +41,7 @@ export class Mission {
     G.nav.rebuild(w); w.navDirty = false;
     this.coreTotal = this.coreAlive = rt.coreTotal;
     for (let i = 0; i < w.phwm; i++) if (w.palive[i] && (w.pflag[i] & F_CORE)) this.corePieces.push(i);
+    this.coreMax = 0; for (const id of this.corePieces) this.coreMax += w.pmax[id]; this.coreMax = this.coreMax || 1;
     this.buildings = rt.buildings.filter((b) => COUNTABLE.has(b.type)).map((b) => ({ info: b, total: w.bTotal[b.bid], dead: false }));
     this.bById = new Map(); for (const b of this.buildings) this.bById.set(b.info.bid, b);
     this.lootTotal = rt.lootTotal;
@@ -60,8 +61,8 @@ export class Mission {
         const type = s.kind === 'guard' ? 'guard' : s.kind;
         if (!ETYPES[type]) continue;
         const p = s.kind === 'turret' ? { x: s.x, y: s.y, z: s.z } : freeSpot(s.x, s.y, s.z);
-        if (defend) { if (allies >= allyCap && s.kind !== 'turret') continue; allies++; G.actors.spawn(type, 0, p.x, p.y, p.z, { look: LOOKS.ally, role: 'guard', hold: s.hold || type === 'sentry', yaw: Math.PI, hpMul: 1.3 }).bid = s.bid; }
-        else { if (foes >= foeCap && s.kind !== 'turret' && s.kind !== 'sentry') continue; foes++; G.actors.spawn(type, 1, p.x, p.y, p.z, { look, hold: !!s.hold, hpMul, dmgMul, yaw: rand(6.28) }).bid = s.bid; }
+        if (defend) { if (allies >= allyCap && s.kind !== 'turret') continue; allies++; G.actors.spawn(type, 0, p.x, p.y, p.z, { look: LOOKS.ally, role: 'guard', hold: s.hold || type === 'sentry', yaw: Math.atan2(p.x, p.z), hpMul: 1.3 }).bid = s.bid; }
+        else { if (foes >= foeCap && s.kind !== 'turret' && s.kind !== 'sentry') continue; foes++; const st = ETYPES[type].static; G.actors.spawn(type, 1, p.x, p.y, p.z, { look, hold: !!s.hold, hpMul, dmgMul, yaw: st ? Math.atan2(p.x, p.z) : rand(6.28) }).bid = s.bid; }
       }
       if (!defend) {
         const r = rng((cfg.village.seed || 1) + 77);
@@ -94,7 +95,8 @@ export class Mission {
   }
   razedCount(kinds) { let n = 0; for (const b of this.buildings) if (b.dead && kinds.includes(b.info.type)) n++; return n; }
   pct() { let d = 0; for (const b of this.buildings) if (b.dead) d++; return this.buildings.length ? d / this.buildings.length : 0; }
-  coreHealth() { return this.coreTotal ? clamp(this.coreAlive / this.coreTotal, 0, 1) : 0; }
+  // hit points left in the Ember Heart (0..1); it shatters at 40%
+  coreHealth() { if (this.coreDestroyed || !this.coreTotal) return 0; const w = G.world; let hp = 0; for (const id of this.corePieces) if (w.palive[id] && (w.pflag[id] & F_CORE)) hp += w.php[id]; return clamp(hp / this.coreMax, 0, 1); }
   evalObj(o) {
     switch (o.type) {
       case 'core': o.done = this.coreDestroyed; o.prog = this.coreDestroyed ? '' : Math.round((1 - clamp((this.coreHealth() - 0.4) / 0.6, 0, 1)) * 100) + '%'; break;
@@ -154,7 +156,7 @@ export class Mission {
     if (this.state === 'menu') return;
     this.stats.bricks++;
     if (flags & F_LOOT) { this.stats.loot++; this.addXp(8); G.fx.goldBurst(x, y, z); if (G.audio) G.audio.ui('coin'); if (G.hud) G.hud.feed('+1 GOLD BAR', '#ffd24a'); this.say('loot' + this.stats.loot); }
-    if (flags & F_CORE) { this.coreAlive--; if (!this.coreDestroyed && this.coreAlive <= this.coreTotal * 0.4) this.shatterCore(); }
+    if (flags & F_CORE) { this.coreAlive--; if (!this.coreDestroyed && this.coreHealth() <= 0.4) this.shatterCore(); }
     if (mat === M.EMBER && !(flags & F_CORE)) { for (const l of G.r3.lampSources) if (!l.dead && Math.abs(l.x - x) < 1.2 && Math.abs(l.z - z) < 1.2 && Math.abs(l.y - y) < 1.5) l.dead = true; }
     const b = this.bById.get(bid);
     if (b && !b.dead && G.world.bAlive[bid] < b.total * 0.55) {
@@ -191,7 +193,7 @@ export class Mission {
     a.goalT = (a.goalT || 0) - dt; if (a.goalT > 0 || this.coreDestroyed) return; a.goalT = 0.8;
     const alive = this.corePieces.filter((id) => G.world.palive[id] && (G.world.pflag[id] & F_CORE));
     if (!alive.length) return;
-    const id = pick(alive); G.world.damagePiece(id, a.T.melee ? 260 : 120, null); a.swing = a.T.melee ? 0 : a.swing;
+    alive.sort((p, q) => G.world.py[q] - G.world.py[p]); const id = alive[0]; G.world.damagePiece(id, a.T.melee ? 80 : a.T.sapper ? 50 : 32, null); a.swing = a.T.melee ? 0 : a.swing;
     G.world.pieceCenter(id, _v); G.fx.sparks(_v.x, _v.y, _v.z, 6, 4); if (G.audio) G.audio.impact('glass', _v.x, _v.y, _v.z);
     if (G.hud) G.hud.toast('THE HEART IS UNDER ATTACK', 1.5, 'core');
   }
@@ -273,6 +275,7 @@ export class Mission {
     if (this.dialogT <= 0 && this.dialogQ.length) { const d = this.dialogQ.shift(); this.dialogT = 2.2 + d.text.length * 0.055; if (G.hud) G.hud.subtitle(d.who, d.text, this.dialogT); if (G.audio) G.audio.ui('radio'); }
     for (const d of (this.cfg.dialog || [])) if (typeof d.at === 'number' && this.time >= d.at && !this.fired.has(d)) { this.fired.add(d); this.dialogQ.push(d); }
     if (this.state !== 'play') return;
+    if (!this.coreDestroyed && this.coreTotal && this.coreHealth() <= 0.4) this.shatterCore();
     if (this.mode === 'defend') this.updateWaves(dt);
     // objectives
     let all = this.objs.length > 0;

@@ -21,7 +21,7 @@ export const MATS = [
   { key: 'sandbag', name: 'Sandbag', color: 0x9a8a63, vary: 0.2, rough: 1.0, metal: 0, pat: 9, hp: 95, snd: 'soft', res: 'wood', cpc: 0.25 },
   { key: 'crate', name: 'Supply Crate', color: 0x8a6a3c, vary: 0.2, rough: 0.8, metal: 0, pat: 10, hp: 22, snd: 'wood', res: 'wood', cpc: 0.3 },
   { key: 'powder', name: 'Blackpowder Keg', color: 0x8c1d14, vary: 0.06, rough: 0.55, metal: 0.2, pat: 11, hp: 9, snd: 'metal', res: 'iron', cpc: 1.5 },
-  { key: 'ember', name: 'Ember Stone', color: 0xff7a1a, vary: 0.15, rough: 0.5, metal: 0, pat: 12, hp: 420, snd: 'glass', res: 'gold', cpc: 99 },
+  { key: 'ember', name: 'Ember Stone', color: 0xff7a1a, vary: 0.15, rough: 0.5, metal: 0, pat: 12, hp: 300, snd: 'glass', res: 'gold', cpc: 99 },
   { key: 'slate', name: 'Slate Tile', color: 0x4a5560, vary: 0.25, rough: 0.6, metal: 0, pat: 3, hp: 32, snd: 'tile', res: 'stone', cpc: 0.35 },
   { key: 'cobble', name: 'Field Stone', color: 0x77736a, vary: 0.4, rough: 0.94, metal: 0, pat: 1, hp: 100, snd: 'stone', res: 'stone', cpc: 0.35 },
   { key: 'cloth', name: 'Banner Cloth', color: 0xb02a2a, vary: 0.05, rough: 0.9, metal: 0, pat: 13, hp: 8, snd: 'soft', res: 'wood', cpc: 0.2 },

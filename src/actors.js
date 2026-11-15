@@ -92,7 +92,7 @@ export class Actor {
     this.sys = sys; this.type = type; this.T = ETYPES[type]; this.team = team; this.opts = opts;
     const dm = opts.hpMul || 1;
     this.maxHp = this.T.hp * dm; this.hp = this.maxHp; this.dmgMul = opts.dmgMul || 1;
-    this.pos = new THREE.Vector3(x, y, z); this.vy = 0; this.yaw = opts.yaw || 0; this.aimPitch = 0;
+    this.pos = new THREE.Vector3(x, y, z); this.vy = 0; this.yaw = opts.yaw || 0; this.aimPitch = 0; this.baseYaw = this.yaw;
     this.height = (this.T.turret ? 0.75 : 1.8) * this.T.scale; this.radius = this.T.turret ? 0.34 : 0.3; this.dead = false; this.deadT = 0; this.noHit = false;
     this.role = opts.role || (this.T.static ? 'sentry' : 'guard'); this.post = new THREE.Vector3(x, y, z); this.hold = !!opts.hold;
     this.alerted = false; this.alertT = 0; this.target = null; this.lastSeen = new THREE.Vector3(x, y, z); this.seenT = 99; this.los = false; this.percT = rand(0.3);
@@ -211,10 +211,10 @@ export class Actor {
       return;
     }
     this.breachT = this.T.melee ? 0.7 : 0.5; this.swing = this.T.melee ? 0 : this.swing;
-    let hit = false; _d.set(dx, 0, dz);
+    let hit = false; _d.set(dx, 0, dz); const seen = this._seen || (this._seen = new Set()); seen.clear();
     for (let h = 0.3; h < 1.7; h += 0.25) for (const s of [-0.2, 0, 0.2]) {
       const id = w.pieceAtWorld(fx - dz * s, this.pos.y + h, fz + dx * s);
-      if (id >= 0) { w.damagePiece(id, this.T.melee ? 150 : 45, _d); hit = true; }
+      if (id >= 0 && !seen.has(id) && !(w.pflag[id] & 32)) { seen.add(id); w.damagePiece(id, this.T.melee ? 150 : 45, _d); hit = true; }
     }
     if (hit) { if (G.audio) G.audio.thud(fx, this.pos.y + 1, fz, 0.8); G.fx.dust(fx, this.pos.y + 1, fz, 1, 0.5); }
   }
@@ -254,12 +254,12 @@ export class Actor {
       if (this.retreat > 0) { this.retreat -= dt; this.tryMove(this.retX * T.speed * dt, this.retZ * T.speed * dt); this.moveX = this.retX; this.moveZ = this.retZ; this.moving = 1; }
       else if (this.role === 'raider' && (!t || !this.los || T.sapper || T.melee && t !== G.player || (this.goalDist() < 9 && !T.melee))) {
         // push toward the objective, breaching whatever is in the way
-        const gl = this.goal || this.post;
-        if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = rand(1.6, 2.6); this.path = G.nav.path(this.pos.x, this.pos.z, gl.x, gl.z, T.melee || T.sapper ? 6 : 14); this.pathI = 0; }
-        if (!this.followPath(dt, T.speed)) {
-          const d = Math.hypot(gl.x - this.pos.x, gl.z - this.pos.z);
-          if (d < 3.2 && G.mode && G.mode.onRaiderAtGoal) G.mode.onRaiderAtGoal(this, dt);
-          else if (d >= 3.2 && !this.path) { const dx = (gl.x - this.pos.x) / d, dz = (gl.z - this.pos.z) / d; if (!this.tryMove(dx * T.speed * dt, dz * T.speed * dt)) this.breach(dt, dx, dz); this.moveX = dx; this.moveZ = dz; this.moving = 1; }
+        const gl = this.goal || this.post, gd = Math.hypot(gl.x - this.pos.x, gl.z - this.pos.z);
+        if (gd < 3.5 && Math.abs(this.pos.y - (gl.y || 0)) < 2.5) { this.path = null; this.yawGoal = Math.atan2(gl.x - this.pos.x, gl.z - this.pos.z); if (G.mode && G.mode.onRaiderAtGoal) G.mode.onRaiderAtGoal(this, dt); }
+        else if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = rand(1.6, 2.6); this.path = G.nav.path(this.pos.x, this.pos.z, gl.x, gl.z, T.melee || T.sapper ? 6 : 14); this.pathI = 0; }
+        if (gd >= 3.5 && !this.followPath(dt, T.speed)) {
+          const d = gd;
+          if (!this.path) { const dx = (gl.x - this.pos.x) / d, dz = (gl.z - this.pos.z) / d; if (!this.tryMove(dx * T.speed * dt, dz * T.speed * dt)) this.breach(dt, dx, dz); this.moveX = dx; this.moveZ = dz; this.moving = 1; }
         }
       } else if (t && this.los) {
         const dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
@@ -294,7 +294,7 @@ export class Actor {
     if (this.target && this.los) { const t = this.target; yawT = Math.atan2(t.pos.x - this.pos.x, t.pos.z - this.pos.z); const ty = t.pos.y + (t === G.player ? 1.2 : t.height * 0.65); pitchT = -Math.atan2(ty - this.eyeY(), Math.hypot(t.pos.x - this.pos.x, t.pos.z - this.pos.z)); this.yawGoal = undefined; }
     else if (this.moving) { yawT = Math.atan2(this.moveX, this.moveZ); this.yawGoal = undefined; }
     else if (T.static && this.alerted && !this.target) { yawT = Math.atan2(this.lastSeen.x - this.pos.x, this.lastSeen.z - this.pos.z); }
-    else if (T.static && !this.alerted) { this.wanderT -= dt; if (this.wanderT <= 0) { this.wanderT = rand(2.5, 6); this.yawGoal = this.yaw + rand(-1.4, 1.4); } }
+    else if (T.static && !this.alerted) { this.wanderT -= dt; if (this.wanderT <= 0) { this.wanderT = rand(2.5, 5); this.yawGoal = this.baseYaw + rand(-1.5, 1.5); } }
     let dy = yawT - this.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU;
     this.yaw += dy * Math.min(1, dt * (T.turret ? 4 : 9)); this.aimPitch = damp(this.aimPitch, pitchT, 10, dt);
     if (!T.civilian) this.shoot(dt);

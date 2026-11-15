@@ -297,7 +297,7 @@ function bastionGen(b) {
   for (let k = 2; k < w - 2; k += 4) for (let i = 2; i < w - 2; i += 4) { if (used.some((c) => c[0] < i + 4 && c[0] + 4 > i && c[1] < k + 4 && c[1] + 4 > k)) continue; b.box(M.WOOD, i, H, k, 4, 1, 4); }
   for (let a = 0; a < w; a += 4) { b.box(M.STONE, a, H, 0, 2, 3, 2); b.box(M.STONE, a, H, w - 2, 2, 3, 2); if (a > 0 && a < w - 2) { b.box(M.STONE, 0, H, a, 2, 3, 2); b.box(M.STONE, w - 2, H, a, 2, 3, 2); } }
   for (let a = 2; a < w - 2; a += 4) { b.box(M.STONE, a, H, 0, 2, 1, 2); b.box(M.STONE, a, H, w - 2, 2, 1, 2); b.box(M.STONE, 0, H, a, 2, 1, 2); b.box(M.STONE, w - 2, H, a, 2, 1, 2); }
-  b.spawn('sentry', w / 2 + 2, H + 1, w / 2 + 2); if (b.lvl > 1) b.spawn('guard', w / 2 - 3, H + 1, w / 2 + 3, { hold: true });
+  b.spawn('sentry', w / 2 + 1, H + 1, 3.4); if (b.lvl > 1) b.spawn('guard', 3.4, H + 1, w / 2 - 1, { hold: true });
   b.lamp(w / 2, H + 4, w / 2, 24); b.meta.door = [w >> 1, w + 2];
 }
 function wallGen(b) { const w = b.w; b.wall(M.STONE, 0, 0, 0, w, 12, 'x', { L: 4, H: 2, T: 2 }); for (let a = 0; a < w; a += 4) b.box(M.STONE, a, 12, 0, 2, 2, 2); }

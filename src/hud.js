@@ -67,7 +67,7 @@ export class HUD {
     if (m.kind === 'raid') t = fmtTime(m.timeLimit - m.time); else if (m.kind === 'story' && m.mode !== 'defend') t = fmtTime(m.time); else if (m.mode === 'defend') t = m.waveState === 'active' ? 'WAVE ' + m.wave : '';
     this.set('timer', 'timer', t);
     if (m.kind === 'raid') { const s = m.raidStars(); this.set('stars', 'stars', `<span class="s">${'★'.repeat(s)}<i>${'★'.repeat(3 - s)}</i></span><br>${Math.round(m.pct() * 100)}% DESTROYED`); } else this.set('stars', 'stars', m.mode === 'defend' && m.waveState === 'active' ? G.actors.countAlive(1) + m.spawnQueue.length + ' HOSTILES' : '');
-    const cb = $('corebar'); if (m.mode === 'defend') { cb.style.display = 'block'; cb.querySelector('i').style.width = clamp((m.coreHealth() - 0.4) / 0.6, 0, 1) * 100 + '%'; } else cb.style.display = 'none';
+    const cb = $('corebar'); if (m.mode === 'defend') { cb.style.display = 'block'; cb.querySelector('i').style.width = clamp((m.coreHealth() - 0.4) / 0.6, 0, 1) * 100 + '%'; cb.style.display = 'block'; } else cb.style.display = 'none';
     // end-raid prompt
     if (m.kind === 'raid' && m.state === 'play') this.prompt(m.endHold > 0 ? 'ENDING RAID… ' + Math.round(m.endHold / 1.2 * 100) + '%' : (m.raidStars() > 0 || m.time > 20 ? 'Hold <b>F</b> to end the raid and keep your loot' : ''));
     else if (m.kind === 'defend' && m.state === 'play' && m.waveState === 'wait' && m.wavesCleared > 0) this.prompt(m.endHold > 0 ? 'RETIRING… ' + Math.round(m.endHold / 1.2 * 100) + '%' : 'Hold <b>F</b> to end the defence and bank your rewards');
