@@ -241,7 +241,7 @@ function vaultGen(b) {
   b.wall(M.STONE, 1, 0, d - 3, w - 2, wh, 'x', { L: 4, H: 2, T: 2, open: fo }); b.wall(M.STONE, 1, 0, 1, w - 2, wh, 'x', { L: 4, H: 2, T: 2 });
   b.wall(M.STONE, 1, 0, 3, d - 6, wh, 'z', { L: 4, H: 2, T: 2 }); b.wall(M.STONE, w - 3, 0, 3, d - 6, wh, 'z', { L: 4, H: 2, T: 2 });
   for (let i = 0; i < 4; i++) b.box(M.METAL, (w >> 1) - 2 + i, 0, d - 3, 1, 8, 1);       // iron-barred door
-  b.fill(M.STONE, 1, wh, 1, w - 2, 1, d - 2, 4, 1, 4); b.fill(M.METAL, 2, wh + 1, 2, w - 4, 1, d - 4, 4, 1, 4);
+  b.fill(M.STONE, 1, wh, 1, w - 2, 1, d - 2, 4, 1, 4); b.fill(M.RUST, 2, wh + 1, 2, w - 4, 1, d - 4, 4, 1, 4);
   b.fill(M.STONE, 3, 0, 3, w - 6, 1, d - 6, 4, 1, 4);
   const n = 10 + L * 5; let k = 0;
   for (let y = 1; y < 6 && k < n; y++) for (let z = 4; z < d - 6 && k < n; z += 2) for (let x = 4; x < w - 5 && k < n; x += 3) { if (((x + z + y) % 5) === 0) continue; b.box(M.GOLD, x, y, z, 2, 1, 1, F_LOOT); k++; }

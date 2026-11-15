@@ -210,6 +210,7 @@ export class AudioSys {
     const prog = mode === 'build' ? [[0, 4, 7], [5, 9, 12], [7, 11, 14], [0, 4, 7], [9, 12, 16], [5, 9, 12], [2, 5, 9], [7, 11, 14]]
       : [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7], [-4, 0, 3], [3, 7, 10], [-5, -1, 2]];
     const root = mode === 'build' ? 196 : 146.83;
+    if (this.nextBeat < c.currentTime - 0.3) this.nextBeat = c.currentTime + 0.05;     // never burst-play beats missed while paused
     while (this.nextBeat < c.currentTime + 0.25) {
       const t = this.nextBeat, b = this.beat, bar = Math.floor(b / 16) % prog.length, ch = prog[bar], st = b % 16;
       const fr = (semi) => root * Math.pow(2, semi / 12);

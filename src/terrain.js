@@ -55,7 +55,8 @@ uniform sampler2D uNoise; uniform sampler2D uSplat; varying vec3 vTW; varying ve
         .replace('#include <map_fragment>', `
 {
   vec2 p = vTW.xz;
-  vec4 na = texture2D(uNoise, p * 0.019); vec4 nb = texture2D(uNoise, p * 0.23 + 0.4); vec4 nc = texture2D(uNoise, p * 1.3); vec4 nd = texture2D(uNoise, p * 6.1);
+  vec2 p2 = vec2(p.x * 0.8253 - p.y * 0.5646, p.x * 0.5646 + p.y * 0.8253);
+  vec4 na = texture2D(uNoise, p * 0.019); vec4 nb = texture2D(uNoise, p2 * 0.067 + 0.4); vec4 nc = texture2D(uNoise, p * 1.3) * 0.6 + texture2D(uNoise, p2 * 0.37 + 0.7) * 0.4; vec4 nd = texture2D(uNoise, p2 * 6.1);
   vec2 suv = p / ${SPLAT_W.toFixed(1)} + 0.5;
   vec4 sp = (suv.x > 0.0 && suv.x < 1.0 && suv.y > 0.0 && suv.y < 1.0) ? texture2D(uSplat, suv) : vec4(0.0);
   vec3 grass = mix(vec3(0.09, 0.16, 0.035), vec3(0.24, 0.3, 0.07), na.r) * (0.62 + 0.76 * nc.g) * (0.8 + 0.4 * nd.r);

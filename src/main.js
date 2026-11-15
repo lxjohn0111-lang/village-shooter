@@ -210,8 +210,8 @@ function step(rdt, real) {
   if (G.adPause) { r3.render(); return; }
   G.game.tick(real);
   if (G.state === 'menu') {
-    G.menuT += rdt; const a = G.menuT * 0.045 + 0.6, R = 40 + Math.sin(G.menuT * 0.07) * 6;
-    cam.position.set(Math.sin(a) * R + 9, 13 + Math.sin(G.menuT * 0.05) * 4, Math.cos(a) * R); cam.lookAt(9, 3.5, 0);
+    G.menuT += rdt; const a = G.menuT * 0.045 + 0.6, R = 31 + Math.sin(G.menuT * 0.07) * 5;
+    cam.position.set(Math.sin(a) * R + 6, 8.5 + Math.sin(G.menuT * 0.05) * 3, Math.cos(a) * R + 2); cam.lookAt(6, 3, 2);
     if (cam.fov !== 50) { cam.fov = 50; cam.updateProjectionMatrix(); }
     G.actors.update(rdt); m.update(rdt); G.world.update(rdt); G.terrain.update(rdt); G.fx.update(rdt, cam);
     r3.focus.set(0, 0, 0); r3.update(rdt); r3.render(); G.audio.update(rdt);
@@ -229,7 +229,7 @@ function step(rdt, real) {
   const running = live || m.state === 'dead' || m.state === 'ended' || m.state === 'winning' || G.busy;
   if (G.startGrace > 0) { G.startGrace -= real; }
   else if (!live && m.state === 'play' && !G.busy && G.ui.modal.classList.contains('hidden')) { SDK.gameplayStop(); G.ui.showPause(); }
-  if (!running) { r3.update(0); r3.render(); return; }
+  if (!running) { r3.update(0); r3.render(); G.audio.update(rdt); return; }
   const dt = rdt * G.timeScale;
   const active = live && m.state !== 'ended' && m.state !== 'dead';
   p.update(dt, active);
