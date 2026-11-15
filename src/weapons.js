@@ -28,13 +28,13 @@ const MAT = {};
 function mats() {
   if (MAT.metal) return MAT;
   const S = THREE.MeshStandardMaterial;
-  MAT.metal = new S({ color: 0x25272b, metalness: 0.9, roughness: 0.38 });
-  MAT.steel = new S({ color: 0x6c7076, metalness: 1, roughness: 0.3 });
-  MAT.poly = new S({ color: 0x17181a, metalness: 0.1, roughness: 0.72 });
+  MAT.metal = new S({ color: 0x4a4e55, metalness: 0.4, roughness: 0.46 });
+  MAT.steel = new S({ color: 0x8a8f98, metalness: 0.65, roughness: 0.34 });
+  MAT.poly = new S({ color: 0x2e3034, metalness: 0.05, roughness: 0.62 });
   MAT.tan = new S({ color: 0x6f6247, metalness: 0.1, roughness: 0.75 });
   MAT.wood = new S({ color: 0x5b3a20, metalness: 0, roughness: 0.55 });
-  MAT.glove = new S({ color: 0x24241f, metalness: 0, roughness: 0.92 });
-  MAT.sleeve = new S({ color: 0x3f4633, metalness: 0, roughness: 0.95 });
+  MAT.glove = new S({ color: 0x35332c, metalness: 0, roughness: 0.9 });
+  MAT.sleeve = new S({ color: 0x424a33, metalness: 0, roughness: 0.95 });
   MAT.brass = new S({ color: 0xb08a3a, metalness: 1, roughness: 0.3 });
   MAT.lens = new S({ color: 0x224455, metalness: 0.9, roughness: 0.05, transparent: true, opacity: 0.35 });
   MAT.dot = new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false });
@@ -52,13 +52,13 @@ function limb(g, m, ax, ay, az, bx, by, bz, r) {
 function hand(g, x, y, z, left) {
   const M_ = mats(), h = new THREE.Group(); h.position.set(x, y, z);
   box(h, M_.glove, 0.07, 0.05, 0.09, 0, 0, 0); box(h, M_.glove, 0.075, 0.03, 0.05, 0, 0.03, -0.02); box(h, M_.glove, 0.025, 0.03, 0.06, left ? 0.04 : -0.04, 0.01, -0.02);
-  limb(h, M_.sleeve, 0, -0.01, 0.05, left ? -0.2 : 0.14, -0.2, 0.42, 0.042); limb(h, M_.glove, 0, -0.005, 0.03, left ? -0.03 : 0.02, -0.03, 0.09, 0.038);
+  limb(h, M_.sleeve, 0, -0.01, 0.05, left ? -0.24 : 0.15, -0.34, 0.52, 0.036); limb(h, M_.glove, 0, -0.005, 0.03, left ? -0.03 : 0.02, -0.03, 0.09, 0.032);
   g.add(h); return h;
 }
 
 // returns {group, mag, bolt, muzzle:Vector3, eject:Vector3, adsY, adsZ, hipPos}
 function buildModel(kind) {
-  const M_ = mats(), g = new THREE.Group(), o = { group: g, mag: null, bolt: null, pump: null, adsY: -0.09, adsZ: -0.2, hip: [0.2, -0.19, -0.44], muzzle: new THREE.Vector3(0, 0.04, -0.7), eject: new THREE.Vector3(0.04, 0.05, -0.08) };
+  const M_ = mats(), g = new THREE.Group(), o = { group: g, mag: null, bolt: null, pump: null, adsY: -0.09, adsZ: -0.2, hip: [0.19, -0.18, -0.54], muzzle: new THREE.Vector3(0, 0.04, -0.7), eject: new THREE.Vector3(0.04, 0.05, -0.08) };
   if (kind === 'rifle' || kind === 'smg' || kind === 'lmg') {
     const L = kind === 'smg' ? 0.72 : kind === 'lmg' ? 1.12 : 1, body = kind === 'lmg' ? M_.green : M_.metal;
     box(g, body, 0.052, 0.078, 0.27, 0, 0.03, -0.08); box(g, M_.metal, 0.054, 0.02, 0.27, 0, 0.075, -0.08);
@@ -86,7 +86,7 @@ function buildModel(kind) {
     cylZ(g, M_.steel, 0.008, 0.02, 0, 0.045, -0.165); box(g, M_.metal, 0.006, 0.012, 0.008, 0, 0.068, -0.145); box(g, M_.metal, 0.02, 0.012, 0.008, 0, 0.068, 0.025);
     box(g, M_.metal, 0.008, 0.02, 0.04, 0, -0.005, -0.03);
     o.bolt = box(g, M_.steel, 0.031, 0.02, 0.06, 0, 0.052, 0.0);
-    o.muzzle.set(0, 0.045, -0.18); o.adsY = -0.073; o.adsZ = -0.28; o.hip = [0.17, -0.16, -0.4]; o.eject.set(0.02, 0.06, -0.03);
+    o.muzzle.set(0, 0.045, -0.18); o.adsY = -0.073; o.adsZ = -0.28; o.hip = [0.16, -0.15, -0.5]; o.eject.set(0.02, 0.06, -0.03);
     o.rh = hand(g, 0.002, -0.05, 0.03, false); o.lh = hand(g, -0.02, -0.07, 0.03, true);
   } else if (kind === 'shotgun') {
     box(g, M_.metal, 0.05, 0.07, 0.24, 0, 0.03, -0.07); cylZ(g, M_.steel, 0.014, 0.56, 0, 0.05, -0.47); cylZ(g, M_.metal, 0.013, 0.42, 0, 0.018, -0.4);
@@ -103,7 +103,7 @@ function buildModel(kind) {
     cylZ(g, M_.metal, 0.021, 0.3, 0, 0.115, -0.08); cylZ(g, M_.metal, 0.028, 0.07, 0, 0.115, -0.26); cylZ(g, M_.metal, 0.025, 0.05, 0, 0.115, 0.09); box(g, M_.metal, 0.02, 0.03, 0.02, 0, 0.085, -0.15); box(g, M_.metal, 0.02, 0.03, 0.02, 0, 0.085, 0.0);
     cylZ(g, M_.metal, 0.008, 0.02, 0.0, 0.142, -0.08).rotation.set(0, 0, 0);
     limb(g, M_.metal, 0, 0.0, -0.5, 0.06, -0.14, -0.56, 0.006); limb(g, M_.metal, 0, 0.0, -0.5, -0.06, -0.14, -0.56, 0.006);
-    o.muzzle.set(0, 0.045, -1.0); o.adsY = -0.115; o.adsZ = -0.06; o.eject.set(0.04, 0.05, -0.02); o.hip = [0.2, -0.2, -0.4];
+    o.muzzle.set(0, 0.045, -1.0); o.adsY = -0.115; o.adsZ = -0.06; o.eject.set(0.04, 0.05, -0.02); o.hip = [0.19, -0.19, -0.48];
     o.lh = hand(g, 0, -0.015, -0.36, true); o.rh = hand(g, 0.002, -0.05, 0.045, false);
   } else if (kind === 'launcher') {
     cylZ(g, M_.metal, 0.03, 0.34, 0, 0.04, -0.42); cylZ(g, M_.green, 0.062, 0.14, 0, 0.02, -0.17); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; cylZ(g, M_.brass, 0.014, 0.142, Math.cos(a) * 0.04, 0.02 + Math.sin(a) * 0.04, -0.17); }
@@ -117,13 +117,13 @@ function buildModel(kind) {
     o.mag = new THREE.Group(); g.add(o.mag); const wh = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 10), mats().red); wh.rotation.x = -Math.PI / 2; wh.position.set(0, 0.07, -0.72); o.mag.add(wh); cylZ(o.mag, M_.steel, 0.03, 0.1, 0, 0.07, -0.6);
     box(g, M_.poly, 0.036, 0.1, 0.045, 0, -0.01, -0.02, 0.2); box(g, M_.poly, 0.034, 0.09, 0.04, 0, -0.01, -0.28, -0.1); box(g, M_.wood, 0.05, 0.02, 0.2, 0, 0.115, 0.1);
     box(g, M_.metal, 0.012, 0.07, 0.03, -0.05, 0.13, -0.2); box(g, M_.metal, 0.03, 0.04, 0.004, -0.05, 0.15, -0.2);
-    o.muzzle.set(0, 0.07, -0.8); o.adsY = -0.15; o.adsZ = -0.1; o.hip = [0.16, -0.16, -0.36]; o.lh = hand(g, 0, -0.05, -0.28, true); o.rh = hand(g, 0.002, -0.05, 0.0, false);
+    o.muzzle.set(0, 0.07, -0.8); o.adsY = -0.15; o.adsZ = -0.1; o.hip = [0.16, -0.16, -0.44]; o.lh = hand(g, 0, -0.05, -0.28, true); o.rh = hand(g, 0.002, -0.05, 0.0, false);
     o.adsX = 0.05;
   } else if (kind === 'sledge') {
     limb(g, M_.wood, 0, -0.25, 0.1, 0, 0.45, -0.25, 0.017); const hd = new THREE.Group(); hd.position.set(0, 0.47, -0.262); hd.rotation.x = -0.46; g.add(hd);
     box(hd, M_.steel, 0.07, 0.07, 0.2, 0, 0, 0); box(hd, M_.metal, 0.075, 0.075, 0.03, 0, 0, 0.09); box(hd, M_.metal, 0.075, 0.075, 0.03, 0, 0, -0.09);
     o.rh = hand(g, 0.0, -0.17, 0.065, false); o.lh = hand(g, 0.0, 0.0, -0.04, true);
-    o.hip = [0.24, -0.3, -0.5]; o.muzzle.set(0, 0.4, -0.4);
+    o.hip = [0.24, -0.3, -0.58]; o.muzzle.set(0, 0.4, -0.4);
   }
   g.traverse((m) => { if (m.isMesh) { m.castShadow = false; m.frustumCulled = false; } });
   return o;
@@ -352,6 +352,7 @@ export class WeaponSys {
     this.rig.position.set(x, y, z); this.rig.rotation.set(rx, ry, rz);
     this.flashT -= dt; this.flash.visible = this.flashT > 0 && a < 0.92 || (this.flashT > 0 && !d.scope);
     this.holder.visible = !(d.scope && a > 0.9) && !player.dead;
+    { const f = Math.tan(27 * Math.PI / 180) / Math.tan(this.camera.fov * Math.PI / 360) * (1 + a * 0.12); this.holder.scale.set(0.42 * Math.min(1, f), 0.42 * Math.min(1, f), 0.42); }
     this.spread = lerp(d.hip * (1 + clamp(player.speed / 6, 0, 1) * 1.6) * (player.crouch ? 0.7 : 1) + this.heat * d.hip * 0.9, d.ads, a);
   }
 

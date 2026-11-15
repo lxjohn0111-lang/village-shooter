@@ -418,7 +418,7 @@ export function bpCost(type, lvl = 1) {
   else {
     const b = generate(type, lvl, 7, {});
     for (const p of b.p) { const m = MATS[p[0]]; if (p[0] === M.EMBER || p[0] === M.GOLD) continue; cost[m.res] += p[4] * p[5] * p[6] * m.cpc * 0.22; }
-    if (type === 'hall') { const k = [0, 3, 7, 14, 26][lvl - 1]; cost.wood = cost.wood * k; cost.stone = cost.stone * k; cost.gold += [0, 1500, 6000, 18000, 45000][lvl - 1]; cost.iron += [0, 200, 900, 2500, 6000][lvl - 1]; }
+    if (type === 'hall') { const k = [0, 3, 6, 10, 15][lvl - 1]; cost.wood = cost.wood * k; cost.stone = cost.stone * k; cost.gold += [0, 1500, 6000, 18000, 45000][lvl - 1]; cost.iron += [0, 200, 900, 2500, 6000][lvl - 1]; }
     if (b.meta.spawns.length) cost.gold += b.meta.spawns.length * 120;
     if (type === 'vault') cost.gold += 300;
     if (type === 'turret') { cost.iron += 180; cost.gold += 250; }
@@ -468,26 +468,31 @@ export function stamp(world, rec, bid, ctx) {
 export function buildVillage(world, village, ctx = {}) {
   const rt = { buildings: [], lamps: [], spawns: [], paths: [], core: null, coreTotal: 0, lootTotal: 0, village };
   let bid = 2;
-  let hall = null;
   for (const rec of village.b) {
     const info = stamp(world, rec, bid++, ctx);
     if (!info) continue;
     rt.buildings.push(info);
     for (const l of info.lamps) rt.lamps.push(l);
     for (const s of info.spawns) { s.bid = info.bid; rt.spawns.push(s); }
-    if (info.corePos) { rt.core = info.corePos; rt.coreTotal += info.core; rt.coreBid = info.bid; hall = info; }
+    if (info.corePos) { rt.core = info.corePos; rt.coreTotal += info.core; rt.coreBid = info.bid; }
     rt.lootTotal += info.loot;
   }
-  if (village.f) for (const p of village.f) world.addPiece(p[0], p[1], p[2], p[3], p[4], p[5], p[6], 1, F_FREE | (p[7] || 0));
-  // dirt paths: gates -> hall, hall -> doors
+  if (village.f) for (const p of village.f) { world.addPiece(p[0], p[1], p[2], p[3], p[4], p[5], p[6], 1, F_FREE | (p[7] || 0)); if (p[0] === M.EMBER) rt.lamps.push({ x: (p[1] + 0.5) * CELL - HALF, y: (p[2] + 0.5) * CELL, z: (p[3] + 0.5) * CELL - HALF, intensity: 40, color: 0xff9a4a }); }
+  rt.paths = villagePaths(rt.buildings);
+  return rt;
+}
+// dirt paths: gates -> hall, hall -> doors
+export function villagePaths(buildings) {
+  const paths = [], hall = buildings.find((b) => b.type === 'hall');
   const hx = hall ? hall.door.x : 0, hz = hall ? hall.door.z : 0;
-  for (const i of rt.buildings) {
+  for (const i of buildings) {
     if (i === hall) continue;
     const big = ['house', 'cabin', 'stonehouse', 'tudor', 'mill', 'quarry', 'forge', 'vault', 'barracks', 'market', 'ashen', 'depot'].includes(i.type);
-    if (i.flags.gate) { const dx = hx - i.cx, dz = hz - i.cz, l = Math.hypot(dx, dz) || 1; rt.paths.push([i.cx - dx / l * 16, i.cz - dz / l * 16, hx, hz, 3.4]); }
-    else if (big) rt.paths.push([i.door.x, i.door.z, hx, hz, 1.9]);
+    if (i.flags.gate) { const dx = hx - i.cx, dz = hz - i.cz, l = Math.hypot(dx, dz) || 1; paths.push([i.cx - dx / l * 16, i.cz - dz / l * 16, hx, hz, 3.4]); }
+    else if (big) paths.push([i.door.x, i.door.z, hx, hz, 1.9]);
   }
-  return rt;
+  if (hall) paths.push([hx, hz, hx, hz + 30, 3]);
+  return paths;
 }
 
 // --------------------------------------------------------------- procedural rival villages
@@ -547,7 +552,7 @@ export function genVillage(seed, level, opts = {}) {
   scatter('vault', clamp(1 + Math.floor(level / 6), 1, 3), clamp(Math.ceil(level / 5), 1, 4));
   if (level >= 14) scatter('bunker', 1);
   if (!opts.legion) { scatter('mill', 1 + (level > 8 ? 1 : 0)); scatter('quarry', level >= 3 ? 1 : 0); scatter('forge', level >= 5 ? 1 : 0); }
-  else { scatter('depot', 2 + Math.floor(level / 5)); scatter('tent', 2 + Math.floor(level / 4)); }
+  else { scatter('depot', 3 + Math.floor(level / 5)); scatter('tent', 2 + Math.floor(level / 4)); }
   const nh = clamp(2 + Math.floor(level * 0.75), 2, 11);
   for (let i = 0; i < nh; i++) { const pool = level < 3 ? ['cabin', 'house'] : level < 6 ? ['cabin', 'house', 'house', 'stonehouse'] : style; scatter(opts.legion ? 'ashen' : r.pick(pool), 1); }
   if (level < 7 && level >= 2) scatter('tower', level >= 4 ? 1 : 0);
@@ -581,10 +586,10 @@ export function starterVillage() {
 const TYPES = Object.keys(BP);
 export function encodeVillage(v) {
   const bytes = [];
-  bytes.push(1, v.b.length & 255, v.b.length >> 8);
+  bytes.push(2, v.b.length & 255, v.b.length >> 8);
   for (const rec of v.b) bytes.push(TYPES.indexOf(rec.t), rec.x, rec.z, (rec.r & 3) | ((rec.l || 1) << 2));
   const f = v.f || []; bytes.push(f.length & 255, f.length >> 8);
-  for (const p of f) bytes.push(p[0], p[1], p[2], p[3], p[4] | (p[5] << 4), p[6]);
+  for (const p of f) bytes.push(p[0], p[1], p[2], p[3], p[4] | (p[5] << 4), p[6], (p[7] || 0) & 23);
   let s = ''; for (const c of bytes) s += String.fromCharCode(c & 255);
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -592,12 +597,12 @@ export function decodeVillage(code) {
   try {
     const s = atob(code.trim().replace(/-/g, '+').replace(/_/g, '/'));
     const a = []; for (let i = 0; i < s.length; i++) a.push(s.charCodeAt(i));
-    if (a[0] !== 1) return null;
+    if (a[0] !== 2) return null;
     let o = 1; const n = a[o] | (a[o + 1] << 8); o += 2;
     const b = [];
     for (let i = 0; i < n; i++) { const t = TYPES[a[o]]; if (!t || BP[t].cat === 'story') return null; b.push({ t, x: a[o + 1], z: a[o + 2], r: a[o + 3] & 3, l: clamp(a[o + 3] >> 2, 1, 5) }); o += 4; }
     const nf = a[o] | (a[o + 1] << 8); o += 2; const f = [];
-    for (let i = 0; i < nf && o + 5 < a.length + 1; i++) { if (a[o] >= MATS.length) return null; f.push([a[o], a[o + 1], a[o + 2], a[o + 3], Math.max(1, a[o + 4] & 15), Math.max(1, a[o + 4] >> 4), Math.max(1, a[o + 5])]); o += 6; }
+    for (let i = 0; i < nf && o + 6 < a.length; i++) { if (a[o] >= MATS.length || a[o] === 14 && false) return null; f.push([a[o], a[o + 1], a[o + 2], a[o + 3], Math.max(1, a[o + 4] & 15), Math.max(1, a[o + 4] >> 4), Math.max(1, a[o + 5]), a[o + 6] & 23]); o += 7; }
     if (!b.some((q) => q.t === 'hall')) return null;
     return { b, f, lvl: 1 };
   } catch (e) { return null; }

@@ -56,7 +56,7 @@ void main(){
 
 const FINAL_SHADER = {
   uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uVignette: { value: 0.45 }, uGrain: { value: 0.035 }, uCA: { value: 0.6 },
+    tDiffuse: { value: null }, uTime: { value: 0 }, uVignette: { value: 0.45 }, uGrain: { value: 0.03 }, uCA: { value: 0.22 },
     uDamage: { value: 0 }, uSat: { value: 1 }, uContrast: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
     uFlash: { value: 0 }, uFade: { value: 0 }, uLow: { value: 0 }, uBars: { value: 0 },
   },
@@ -165,6 +165,10 @@ export class Renderer3D {
     const sc = this.sun.shadow.camera;
     sc.left = -this.shadowExtent; sc.right = this.shadowExtent; sc.top = this.shadowExtent; sc.bottom = -this.shadowExtent;
     sc.near = 1; sc.far = 420; sc.updateProjectionMatrix();
+    // fewer dynamic point lights on low settings (each one is paid for by every lit pixel)
+    this.nLamps = [1, 2, 3, 4][q]; this.nFx = [1, 2, 2, 3][q];
+    this.lamps.forEach((l, i) => { l.visible = i < this.nLamps; if (!l.visible) l.intensity = 0; });
+    this.fxLights.forEach((l, i) => { l.visible = i < this.nFx; if (!l.visible) { l.intensity = 0; l.userData.t = 0; } });
     this.applyEnvUniforms();
   }
 
@@ -209,7 +213,7 @@ export class Renderer3D {
 
   flashLight(pos, color, intensity, dur = 0.08, dist = 18) {
     let best = this.fxLights[0];
-    for (const l of this.fxLights) if (l.userData.t < best.userData.t) best = l;
+    for (let i = 0; i < this.nFx; i++) { const l = this.fxLights[i]; if (l.userData.t < best.userData.t) best = l; }
     best.position.copy(pos); best.color.set(color); best.intensity = intensity; best.distance = dist;
     best.userData.t = dur; best.userData.dur = dur; best.userData.i0 = intensity;
   }
@@ -233,7 +237,7 @@ export class Renderer3D {
       src.sort((a, b) => a._d - b._d);
     }
     const lampScale = this.env.moon || this.envName === 'dusk' || this.envName === 'storm' || this.envName === 'ashen' ? 1 : 0.25;
-    for (let i = 0; i < this.lamps.length; i++) {
+    for (let i = 0; i < this.nLamps; i++) {
       const l = this.lamps[i], s = src[i];
       if (s && !s.dead) {
         l.position.set(s.x, s.y, s.z); l.color.set(s.color || 0xff9a4a);

@@ -318,10 +318,10 @@ transformed.z += cos(uTime * 0.9 + ph + position.y * 0.4) * 0.03 * position.y;`)
     if (this.grass) { this.scene.remove(this.grass); this.grass.geometry.dispose(); this.grass.material.dispose(); }
     const count = [5000, 13000, 26000, 42000][quality] || 13000;
     const r = rng(31);
-    const BL = 6, pos = [], col = [], nor = [];
+    const BL = 10, pos = [], col = [], nor = [];
     for (let b = 0; b < BL; b++) {
-      const a = r() * 6.283, d = r() * 0.16, bx = Math.cos(a) * d, bz = Math.sin(a) * d;
-      const dir = r() * 6.283, w = 0.02 + r() * 0.018, h = 0.24 + r() * 0.3, lean = 0.05 + r() * 0.12;
+      const a = r() * 6.283, d = r() * 0.2, bx = Math.cos(a) * d, bz = Math.sin(a) * d;
+      const dir = r() * 6.283, w = 0.006 + r() * 0.007, h = 0.16 + r() * 0.3, lean = 0.05 + r() * 0.12;
       const wx = Math.cos(dir) * w, wz = Math.sin(dir) * w, lx = -Math.sin(dir) * lean, lz = Math.cos(dir) * lean;
       const v = [[bx - wx, 0, bz - wz], [bx + wx, 0, bz + wz], [bx - wx * 0.6 + lx * 0.4, h * 0.5, bz - wz * 0.6 + lz * 0.4], [bx + wx * 0.6 + lx * 0.4, h * 0.5, bz + wz * 0.6 + lz * 0.4], [bx + lx, h, bz + lz]];
       for (const k of [0, 1, 2, 1, 3, 2, 2, 3, 4]) { pos.push(...v[k]); const t = v[k][1] / h; col.push(0.35 + t * 0.65, 0.4 + t * 0.6, 0.3 + t * 0.5); nor.push(0, 1, 0); }
@@ -349,12 +349,12 @@ transformed.x += gw * position.y * 0.22; transformed.z += gw * position.y * 0.1;
       if (md < 36 && r() > (md - 32.5) / 3.5) continue;
       const h = terrainH(x, z); if (h < -0.4) continue;
       if (noise2(x * 0.15 + 7, z * 0.15) < 0.28) continue;
-      const s = 0.8 + r() * 1.1;
+      const s = 0.9 + r() * 1.3;
       q.setFromEuler(e.set(0, r() * 6.283, 0));
       m.compose(new THREE.Vector3(x, h - 0.02, z), q, new THREE.Vector3(s, s * (0.7 + r() * 0.8), s));
       mesh.setMatrixAt(n, m);
       const dry = noise2(x * 0.05 + 40, z * 0.05 + 3);
-      c.setRGB(0.2 + dry * 0.3 + r() * 0.08, 0.34 + r() * 0.14, 0.07 + r() * 0.04); mesh.setColorAt(n, c);
+      c.setRGB(0.1 + dry * 0.22 + r() * 0.06, 0.24 + dry * 0.06 + r() * 0.1, 0.045 + r() * 0.03); mesh.setColorAt(n, c);
       n++;
     }
     mesh.count = n; mesh.frustumCulled = false; mesh.receiveShadow = true; mesh.castShadow = false;

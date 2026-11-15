@@ -22,11 +22,11 @@ function mesh(parent, geo, m, sx, sy, sz, x, y, z, shadow = true) { const o = ne
 function limb(parent, m, ax, ay, az, bx, by, bz, r) { const a = new THREE.Vector3(ax, ay, az), d = new THREE.Vector3(bx, by, bz).sub(a); const o = new THREE.Mesh(GEO.cyl, m); o.scale.set(r, d.length(), r); o.position.copy(a).addScaledVector(d, 0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); o.castShadow = true; o.receiveShadow = true; parent.add(o); return o; }
 
 export const LOOKS = {
-  legion: { cloth: 0x34373a, armor: 0x5e1d18, helmet: 0x232326, skin: 0xb98a6a },
-  ally: { cloth: 0x2f4f7a, armor: 0x6b5a3c, helmet: 0x6e7378, skin: 0xc49a78 },
+  legion: { cloth: 0x34373a, armor: 0x5e1d18, helmet: 0x232326, skin: 0xb98a6a, accent: 0x8a1a12 },
+  ally: { cloth: 0x3a4a5e, armor: 0x6b5a3c, helmet: 0x6e7378, skin: 0xc49a78, accent: 0x2f7fd0 },
   civilian: { cloth: 0x8a7a5c, armor: 0x6b5a3c, helmet: 0, skin: 0xc49a78 },
 };
-export function clanLook(color) { const c = new THREE.Color(color).multiplyScalar(0.7); return { cloth: c.getHex(), armor: 0x5a4a32, helmet: 0x5c6166, skin: 0xbf9272 }; }
+export function clanLook(color) { const c = new THREE.Color(color).lerp(new THREE.Color(0x3b3a36), 0.62); return { cloth: c.getHex(), armor: 0x5a4a32, helmet: 0x5c6166, skin: 0xbf9272, accent: color }; }
 
 function buildHumanoid(type, look) {
   const T = ETYPES[type], root = new THREE.Group(), P = { root };
@@ -38,6 +38,7 @@ function buildHumanoid(type, look) {
   mesh(torso, GEO.box, cloth, 0.38, 0.5, 0.22, 0, 0.3, 0);
   if (!T.civilian) { mesh(torso, GEO.box, armor, 0.42, 0.34, 0.27, 0, 0.35, 0.005); mesh(torso, GEO.box, dark, 0.3, 0.3, 0.12, 0, 0.32, -0.17); for (let i = -1; i <= 1; i++) mesh(torso, GEO.box, dark, 0.08, 0.1, 0.05, i * 0.11, 0.2, 0.15, false); }
   if (T.armor) { mesh(torso, GEO.box, armor, 0.16, 0.08, 0.26, 0.26, 0.56, 0); mesh(torso, GEO.box, armor, 0.16, 0.08, 0.26, -0.26, 0.56, 0); }
+  if (look.accent !== undefined && !T.civilian) { mesh(torso, GEO.box, mat(look.accent, 0.85), 0.13, 0.13, 0.25, -0.235, 0.47, 0, false); mesh(torso, GEO.box, mat(look.accent, 0.85), 0.385, 0.06, 0.225, 0, 0.09, 0, false); }
   const head = P.head = new THREE.Group(); head.position.y = 0.6; torso.add(head);
   mesh(head, GEO.cyl, skin, 0.05, 0.08, 0.05, 0, 0.02, 0, false);
   mesh(head, GEO.sph, skin, 0.1, 0.118, 0.105, 0, 0.14, 0);
@@ -144,7 +145,7 @@ export class Actor {
   }
 
   pickTarget() {
-    const w = G.world, ey = this.eyeY(), range = this.alerted ? this.T.range * 1.25 : this.T.range * (G.r3.env.moon ? 0.55 : 0.85);
+    const w = G.world, ey = this.eyeY(), range = this.alerted ? this.T.range * 1.25 : Math.min(this.T.range * 0.55, 30) * (G.r3.env.moon || G.r3.env.rain ? 0.65 : 1);
     let best = null, bd = 1e9;
     const consider = (t, tx, ty, tz) => {
       const dx = tx - this.pos.x, dz = tz - this.pos.z, d = Math.hypot(dx, dz); if (d > range || d >= bd) return;

@@ -69,7 +69,7 @@ export class Mission {
           for (let k = 0; k < 30; k++) { const x = r.range(-24, 24), z = r.range(-24, 20); if (G.nav.isBlocked(x, z) || Math.hypot(x - this.spawn.x, z - this.spawn.z) < 14) continue; const p = freeSpot(x, 0, z); G.actors.spawn(type, 1, p.x, p.y, p.z, { look, hpMul, dmgMul, yaw: r() * 6.28 }); foes++; break; }
         }
         if (cfg.boss && rt.core) { const p = freeSpot(rt.core.x, 0, rt.core.z + 9); this.boss = G.actors.spawn('boss', 1, p.x, p.y, p.z, { look: LOOKS.legion, hpMul: 1, dmgMul: 1.1, yaw: 0 }); }
-      } else if (cfg.kind === 'story' && allyCap > allies) {
+      } else if (cfg.kind === 'story' && cfg.allies !== undefined && allyCap > allies) {
         for (let i = allies; i < allyCap; i++) { const p = freeSpot(rand(-8, 8), 0, rand(8, 16)); G.actors.spawn('guard', 0, p.x, p.y, p.z, { look: LOOKS.ally, hpMul: 1.4, yaw: Math.PI }); }
       }
     } else {
@@ -90,6 +90,7 @@ export class Mission {
     if (this.kind === 'raid') this.objs = [{ type: 'raidPct', text: 'Raze the village', done: false, prog: '' }, { type: 'core', text: 'Shatter the Ember Heart', done: false, prog: '' }];
     if (this.kind === 'defend') this.objs = [{ type: 'endless', text: 'Hold out as long as you can', done: false, prog: '' }, { type: 'protect', text: 'Keep the Ember Heart intact', done: false, prog: '' }];
     for (const o of this.objs) if (o.type === 'killType') o.total = G.actors.list.filter((a) => a.team === 1 && o.kinds.includes(a.type)).length;
+    for (const o of this.objs) if (o.type === 'raze') { const have = this.buildings.filter((b) => o.kinds.includes(b.info.type)).length; if (have < o.n) o.n = Math.max(1, have); }
   }
   razedCount(kinds) { let n = 0; for (const b of this.buildings) if (b.dead && kinds.includes(b.info.type)) n++; return n; }
   pct() { let d = 0; for (const b of this.buildings) if (b.dead) d++; return this.buildings.length ? d / this.buildings.length : 0; }

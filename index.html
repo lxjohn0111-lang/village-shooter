@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Emberhold: Village Wars</title>
+<meta name="description" content="Build your village brick by brick, raid rival strongholds and tear them down to the last stone in a fully destructible first-person shooter.">
+<link rel="stylesheet" href="style.css">
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/addons/"}}</script>
+</head>
+<body>
+<canvas id="c" tabindex="0"></canvas>
+
+<div id="hud" class="layer hidden">
+  <div id="markers"></div>
+  <div id="scope"><div class="sc-h"></div><div class="sc-v"></div><div class="sc-ring"></div><div class="sc-t t1"></div><div class="sc-t t2"></div><div class="sc-t t3"></div></div>
+  <div id="xhair"><i class="l"></i><i class="r"></i><i class="u"></i><i class="d"></i><b></b></div>
+  <div id="hitm"><i></i><i></i><i></i><i></i></div>
+  <div id="dmgdir"></div>
+  <div id="objs"></div>
+  <div id="topc"><div id="timer"></div><div id="stars"></div><div id="corebar"><span>EMBER HEART</span><div><i></i></div></div></div>
+  <div id="feed"></div>
+  <div id="banner"><div class="bt"></div><div class="bs"></div></div>
+  <div id="streak"></div>
+  <div id="toast"></div>
+  <div id="prompt"></div>
+  <div id="subtitle"><div class="who"></div><div class="txt"></div></div>
+  <canvas id="radar" width="150" height="150"></canvas>
+  <div id="vitals"><div class="hpnum"></div><div class="hpbar"><i></i></div></div>
+  <div id="ammo"><div class="wname"></div><div class="count"><b class="mag"></b><span class="res"></span></div><div class="slots"></div><div class="nades"></div></div>
+  <div id="dmgnums"></div>
+  <div id="warn"></div>
+</div>
+
+<div id="buildhud" class="layer hidden">
+  <div id="b-top"></div>
+  <div id="b-info"></div>
+  <div id="b-help"></div>
+  <div id="b-cross"></div>
+  <div id="b-bar"><div id="b-cats"></div><div id="b-items"></div></div>
+  <div id="b-toast"></div>
+</div>
+
+<div id="menu" class="layer hidden">
+  <div id="topbar"></div>
+  <div id="side">
+    <div id="logo"><div class="l1">EMBERHOLD</div><div class="l2">VILLAGE WARS</div></div>
+    <div id="nav"></div>
+    <div id="sidefoot"></div>
+  </div>
+  <div id="panel"></div>
+</div>
+
+<div id="modal" class="layer hidden"></div>
+<div id="fade"></div>
+<div id="loading" class="layer">
+  <div class="ld-in">
+    <div class="l1">EMBERHOLD</div><div class="l2">VILLAGE WARS</div>
+    <div class="ld-bar"><i id="ld-fill"></i></div>
+    <div id="ld-text">Lighting the hearth…</div>
+  </div>
+</div>
+<div id="fps" class="hidden"></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
