@@ -3,7 +3,7 @@ import { G } from './util.js';
 
 export const Input = {
   keys: {}, pressed: {}, released: {}, mdx: 0, mdy: 0, wheel: 0, buttons: [false, false, false], bPressed: [false, false, false], bReleased: [false, false, false],
-  locked: false, wantLock: false, virtual: false, noLock: false,
+  locked: false, wantLock: false, virtual: false, noLock: false, skipMove: 0,
   init(canvas) {
     this.canvas = canvas;
     window.addEventListener('keydown', (e) => {
@@ -23,11 +23,12 @@ export const Input = {
       e.preventDefault();
     });
     window.addEventListener('mouseup', (e) => { if (e.button < 3) { this.buttons[e.button] = false; this.bReleased[e.button] = true; } });
-    window.addEventListener('mousemove', (e) => { if (this.locked) { this.mdx += e.movementX || 0; this.mdy += e.movementY || 0; } });
+    // some browsers report one huge bogus delta right after the pointer is captured: drop the first move and any absurd jump
+    window.addEventListener('mousemove', (e) => { if (!this.locked) return; if (this.skipMove > 0) { this.skipMove--; return; } const mx = e.movementX || 0, my = e.movementY || 0; if (Math.abs(mx) > 400 || Math.abs(my) > 400) return; this.mdx += mx; this.mdy += my; });
     window.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === canvas;
+      this.locked = document.pointerLockElement === canvas; if (this.locked) this.skipMove = 1;
       if (!this.locked) { this.buttons = [false, false, false]; if (G.onPointerUnlock) G.onPointerUnlock(); }
       else if (G.onPointerLock) G.onPointerLock();
     });

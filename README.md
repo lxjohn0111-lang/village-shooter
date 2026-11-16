@@ -38,12 +38,23 @@ daily tribute, daily quests and achievements.
 | Key | Action |
 | --- | --- |
 | WASD / Shift / C or Ctrl / Space | Move / sprint / crouch (slide while sprinting) / jump and mantle |
-| LMB / RMB | Fire / aim down sights |
-| R, G, V | Reload, frag grenade, sledgehammer |
-| 1 2 3, mouse wheel, Q | Switch weapon |
+| LMB / RMB | Fire / aim down sights (scoped: hold Shift to steady your breath) |
+| Q / E | Lean left / right out of cover |
+| R | Reload (with a round still chambered it is a faster tactical reload and you keep the +1) |
+| G | Frag grenade — hold to cook, release to throw |
+| V | Quick melee strike with the weapon butt |
+| 1 2 3, mouse wheel | Switch weapon (3 is the sledgehammer) |
 | F (hold) | End raid / retire from defence |
 | Esc | Pause |
 | **Build:** LMB / RMB / R / wheel / 1-5 / Z / F / Tab | Place / remove / rotate / next item / category / undo / walk-fly / free cursor |
+
+## Combat model
+
+* **Bullets are projectiles**: they have muzzle velocity, travel time and drop, punch through glass, planks and plaster, skip off stone and steel, and are drawn as tracers along their real path.
+* **Recoil** follows a learnable per-weapon spray pattern; when you stop firing the aim settles most of the way back.
+* **Enemies** look for cover (low walls, window sills, corners to lean round), pop up to fire in bursts, run dry and reload, call out what they are doing, and keep their heads down when rounds crack past them. Only a few may fire at you at once.
+* **Helmets** on officers and heavies absorb a headshot and get knocked off; marksmen telegraph their shot.
+* **Deaths are physical**: a 15-point verlet ragdoll takes over from the exact pose the soldier was in, driven by where and how hard the killing hit landed. Weapons are dropped (walk over them for ammunition), explosions throw bodies.
 
 ## CrazyGames SDK integration (`src/sdk.js`)
 
@@ -81,8 +92,9 @@ src/world.js            brick grid, instanced rendering, surface shader, damage,
 src/blueprints.js       building generators, village generator, share codes
 src/terrain.js          ground, grass, trees, rocks, lake
 src/render.js           renderer, sky, time-of-day presets, post-processing
-src/player.js combat.js weapons.js   controller, ballistics, weapons and view models
-src/actors.js nav.js    soldiers, turrets, mines, AI and pathfinding
+src/player.js combat.js weapons.js   controller, projectile ballistics, weapon handling
+src/geo.js guns.js models.js         geometry toolkit, detailed weapon and soldier models
+src/actors.js ragdoll.js nav.js      skeletal animation + IK, AI, ragdoll deaths, pathfinding
 src/modes.js story.js   mission engine and the campaign
 src/build.js            village builder
 src/game.js             profile, economy, quests, rewards

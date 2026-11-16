@@ -55,7 +55,7 @@ export class Actor {
     this.burst = 0; this.shotT = 0; this.restT = rand(0.5, 1.5); this.chargeT = -1; this.react = 0; this.crouchT = 0; this.crouch = 0; this.nadeT = rand(6, 12); this.rocketT = rand(4, 7);
     this.breachT = 0; this.stuckT = 0; this.goal = opts.goal || null; this.freed = false; this.swing = -1; this.fallFrom = y; this.wanderT = rand(2, 6); this.calledHelp = false;
     this.magLeft = T.mag || 0; this.reloadT = -1; this.suppress = 0; this.cover = null; this.atCover = false; this.coverT = rand(0.5, 2); this.stagger = 0; this.helmetLeft = T.helmet || 0;
-    this.hitX = 0; this.hitY = 0; this.hitZ = 0; this.gunKick = 0; this.velX = 0; this.velZ = 0; this.phase = rand(6); this.rag = null; this.aimBlend = 0; this.lookYaw = 0;
+    this.hitX = 0; this.hitY = 0; this.hitZ = 0; this.gunKick = 0; this.velX = 0; this.velZ = 0; this.phase = rand(6); this.rag = null; this.aimBlend = 0; this.lookYaw = 0; this.investT = 99;
     if (T.turret) this.P = buildTurret();
     else { this.P = buildSoldier(type, opts.look || LOOKS.legion, randi(0, 2), (x * 131 + z * 71) | 0); this.P.root.scale.setScalar(T.scale * rand(0.97, 1.03)); if (!this.P.helmet) this.helmetLeft = 0; }
     this.P.root.position.copy(this.pos); this.P.root.rotation.y = this.yaw;
@@ -105,7 +105,7 @@ export class Actor {
     if (this.T.civilian || this.dead) return;
     if (!this.alerted) { this.alerted = true; this.react = rand(0.35, 0.8) / (G.diffAcc || 1); this.sys.shout(this); if (this.team !== 0) this.sys.bark(this, pick(['CONTACT!', 'INTRUDER!', 'OVER THERE!', 'HOSTILE!'])); if (G.mode && G.mode.onAlert) G.mode.onAlert(this); }
     this.alertT = 0;
-    if (pos && (direct || this.seenT > 2)) { this.lastSeen.copy(pos); if (!direct) { this.lastSeen.x += rand(-3, 3); this.lastSeen.z += rand(-3, 3); } this.investigate = true; }
+    if (pos && (direct || this.seenT > 2)) { this.lastSeen.copy(pos); if (!direct) { this.lastSeen.x += rand(-3, 3); this.lastSeen.z += rand(-3, 3); } this.investigate = true; this.investT = 0; }
   }
 
   tryMove(dx, dz) {
@@ -144,19 +144,24 @@ export class Actor {
     } else { this.los = false; this.aware = false; if (this.target && (this.target.dead || this.seenT > 9)) this.target = null; }
   }
 
-  // look for a spot nearby that hides a crouching body from the target, ideally one we can shoot over
+  // look for a spot nearby that hides a crouching body from the target and that we can fight from:
+  // low cover to pop up over (sandbags, window sills, crates) or a corner to lean out from
   findCover(t) {
     const w = G.world, s = this.T.scale, tx = t.pos.x, tz = t.pos.z, ty = t.pos.y + 1.25;
-    let best = null, bs = 1.4;
-    for (let i = 0; i < 12; i++) {
-      const a = rand(TAU), r = rand(1.2, 9), x = this.pos.x + Math.cos(a) * r, z = this.pos.z + Math.sin(a) * r;
+    let best = null, bs = 1.6;
+    for (let i = 0; i < 26; i++) {
+      const a = rand(TAU), r = rand(1.0, 11), x = this.pos.x + Math.cos(a) * r, z = this.pos.z + Math.sin(a) * r;
       if (G.nav.isBlocked(x, z)) continue;
       const gy = w.groundAt(x, z, this.pos.y + 0.56); if (Math.abs(gy - this.pos.y) > 0.6) continue;
       const dT = Math.hypot(x - tx, z - tz); if (dT < 5 || dT > this.T.range) continue;
-      if (w.los(x, gy + 0.9 * s, z, tx, ty, tz)) continue;
-      const peek = w.los(x, gy + 1.52 * s, z, tx, ty, tz);
-      const sc = 2 + (peek ? 2.6 : 0) - r * 0.13 - Math.abs(dT - this.T.pref) * 0.05 + rand(0.9);
-      if (sc > bs) { bs = sc; best = { x, z, y: gy, peek }; }
+      if (w.los(x, gy + 0.9 * s, z, tx, ty, tz)) continue;                       // not hidden when crouched
+      let peek = w.los(x, gy + 1.52 * s, z, tx, ty, tz), px, pz;
+      if (!peek) {                                                               // try leaning out either side
+        const ux = -(tz - z) / dT, uz = (tx - x) / dT;
+        for (const sd of [0.75, -0.75]) { const qx = x + ux * sd, qz = z + uz * sd; if (!G.nav.isBlocked(qx, qz) && w.los(qx, gy + 1.52 * s, qz, tx, ty, tz) && w.boxFree(qx - 0.25, gy + 0.56, qz - 0.25, qx + 0.25, gy + 1.5, qz + 0.25)) { px = qx; pz = qz; peek = true; break; } }
+      }
+      const sc = 2 + (peek ? 2.6 : 0) - r * 0.11 - Math.abs(dT - this.T.pref) * 0.05 + rand(0.9);
+      if (sc > bs) { bs = sc; best = { x, z, y: gy, peek, px, pz }; }
     }
     if (best) { this.cover = best; this.atCover = false; this.path = null; this.pathT = 0; if (Math.random() < 0.25) this.sys.bark(this, pick(['MOVING!', 'COVER ME!', 'TAKING COVER!', 'FLANKING!'])); }
   }
@@ -173,6 +178,8 @@ export class Actor {
     if (this.burst <= 0) {
       if (this.restT > 0) return;
       if (this.crouch > 0.3 && !T.static) return;          // still rising out of cover
+      if (t === G.player && !T.static && this.sys.onPlayer >= 3) { this.restT = rand(0.3, 0.8); return; }
+      if (t === G.player) this.sys.onPlayer++;
       if (T.charge) { if (this.chargeT < 0) this.chargeT = 0; this.chargeT += dt; if (t === G.player && G.hud) G.hud.sniperWarn(this, this.chargeT / T.charge); G.fx.seg(ex, ey, ez, tx, ty, tz, 1, 0.06, 0.04, 0.006 + 0.006 * this.chargeT / T.charge, 0.5); if (this.chargeT < T.charge) return; this.chargeT = -1; }
       this.burst = Math.min(this.magLeft, randi(T.burst[0], T.burst[1])); this.shotT = 0;
     }
@@ -182,7 +189,7 @@ export class Actor {
     const tvx = t === G.player ? t.vel.x : (t.velX || 0), tvz = t === G.player ? t.vel.z : (t.velZ || 0), lead = dist / T.vel * (T.static ? 0.85 : 0.55);
     tx += tvx * lead; tz += tvz * lead;
     const tv = Math.hypot(tvx, tvz);
-    let sp = T.spread * (1 + tv * 0.14) * (1 + Math.max(0, 1.4 - this.alertT) * 1.2) * (1 + this.suppress * 1.3) / (G.diffAcc || 1);
+    let sp = T.spread * (T.static ? 1 : t === G.player ? 1.65 : 1.2) * (1 + tv * 0.16) * (1 + Math.max(0, 1.4 - this.alertT) * 1.2) * (1 + this.suppress * 1.3) / (G.diffAcc || 1);
     if (t === G.player && t.crouch) sp *= 1.2;
     _o.set(ex, ey, ez); _d.set(tx - ex + rand(-1, 1) * sp * dist, ty - ey + rand(-1, 1) * sp * dist * 0.7 + dist * dist / (T.vel * T.vel) * 4.9, tz - ez + rand(-1, 1) * sp * dist).normalize();
     G.combat.fireBullet({ origin: _o, dir: _d, dmg: T.dmg * this.dmgMul, brick: T.turret ? 0.5 : 0.4, range: T.range * 1.5, shooter: this, team: this.team, head: 1.5, speed: T.vel, impulse: 2.5, tracer: true, color: this.team === 0 ? [0.6, 0.85, 1] : [1, 0.5, 0.25], kind: T.snd });
@@ -227,20 +234,21 @@ export class Actor {
     this.coverT -= dt;
     if (!this.hold && !T.melee && !T.boss && (this.coverT <= 0 || (this.suppress > 0.55 && !this.cover && this.coverT < 2)) && this.sys.coverBudget > 0) { this.sys.coverBudget--; this.coverT = rand(4, 7.5); this.findCover(t); }
     if (this.cover) {
-      const c = this.cover, cx = c.x - this.pos.x, cz = c.z - this.pos.z, cd = Math.hypot(cx, cz);
-      if (cd > 0.4) {
-        this.atCover = false;
-        if (cd > 2.5 && !this.path && this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = 1.5; this.path = G.nav.path(this.pos.x, this.pos.z, c.x, c.z, 0); this.pathI = 0; }
+      const c = this.cover, up = this.restT <= 0.4 && this.reloadT < 0 && this.suppress < 0.8 && c.peek, out = up && c.px !== undefined;
+      const gx = out ? c.px : c.x, gz = out ? c.pz : c.z, cx = gx - this.pos.x, cz = gz - this.pos.z, cd = Math.hypot(cx, cz);
+      if (cd > 0.3) {
+        if (!this.wasAt) this.atCover = false;
+        if (cd > 2.5 && !this.path && this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = 1.5; this.path = G.nav.path(this.pos.x, this.pos.z, gx, gz, 0); this.pathI = 0; }
         if (this.path) { if (!this.followPath(dt, T.speed)) this.path = null; }
-        else { if (!this.tryMove(cx / cd * T.speed * dt, cz / cd * T.speed * dt)) { this.stuckT += dt; if (this.stuckT > 1) { this.cover = null; this.stuckT = 0; } } this.moveX = cx / cd; this.moveZ = cz / cd; this.moving = 1; }
+        else { const sp = Math.min(T.speed, cd / dt); if (!this.tryMove(cx / cd * sp * dt, cz / cd * sp * dt)) { this.stuckT += dt; if (this.stuckT > 1) { this.cover = null; this.wasAt = false; this.stuckT = 0; } } this.moveX = cx / cd; this.moveZ = cz / cd; this.moving = 1; }
       } else {
-        this.atCover = true; this.path = null;
-        const up = this.restT <= 0.35 && this.reloadT < 0 && this.suppress < 0.8 && c.peek;
+        this.atCover = !out; this.wasAt = true; this.path = null;
         this.crouchT = up ? 0 : 0.25;
-        if (!c.peek && this.restT <= 0 && this.reloadT < 0 && this.suppress < 0.5) { this.cover = null; this.atCover = false; this.coverT = rand(1.5, 3); }   // nothing to shoot over: step out
+        if (!c.peek && this.restT <= 0 && this.reloadT < 0 && this.suppress < 0.5) { this.cover = null; this.atCover = false; this.wasAt = false; this.coverT = rand(1.5, 3); }   // nothing to shoot from: step out
       }
       return;
     }
+    this.wasAt = false;
     this.atCover = false;
     if (this.tactT <= 0) {
       this.tactT = rand(1.2, 2.8); const r = Math.random();
@@ -264,7 +272,7 @@ export class Actor {
       const alive = this.rag.update(dt); this.rag.center(this.pos);
       return alive;
     }
-    this.alertT += dt; this.seenT += dt; this.suppress = Math.max(0, this.suppress - dt * 0.33); this.stagger = Math.max(0, this.stagger - dt); this.pathT -= dt; this.tactT -= dt;
+    this.alertT += dt; this.seenT += dt; this.investT += dt; this.suppress = Math.max(0, this.suppress - dt * 0.33); this.stagger = Math.max(0, this.stagger - dt); this.pathT -= dt; this.tactT -= dt;
     const px0 = this.pos.x, pz0 = this.pos.z;
     // --- gravity / support
     const ground = w.groundAt(this.pos.x, this.pos.z, this.pos.y + 0.56);
@@ -297,13 +305,13 @@ export class Actor {
           if (!this.path) { const dx = (gl.x - this.pos.x) / gd, dz = (gl.z - this.pos.z) / gd; if (!this.tryMove(dx * T.speed * dt, dz * T.speed * dt)) this.breach(dt, dx, dz); this.moveX = dx; this.moveZ = dz; this.moving = 1; }
         }
       } else if (t && (this.los || this.aware)) this.combatMove(dt, t);
-      else if (this.alerted && (t || this.investigate) && this.seenT < 25 && !this.hold) {
+      else if (this.alerted && (t || this.investigate) && (this.seenT < 25 || this.investT < 20) && !this.hold) {
         // hunt toward last known position
         this.cover = null; this.atCover = false;
         const leash = this.role === 'guard' ? Math.hypot(this.lastSeen.x - this.post.x, this.lastSeen.z - this.post.z) < 60 : true;
         if (leash) {
           if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = rand(1.1, 2); this.path = G.nav.path(this.pos.x, this.pos.z, this.lastSeen.x, this.lastSeen.z, T.melee ? 5 : 0); this.pathI = 0; }
-          if (!this.followPath(dt, T.speed) && this.path && this.pathI >= this.path.length) { this.investigate = false; if (this.seenT > 6) this.target = null; }
+          if (!this.followPath(dt, T.speed) && this.path && this.pathI >= this.path.length) { this.investigate = false; this.investT = 99; if (this.seenT > 6) this.target = null; }
         }
       } else if (!this.hold) {
         // idle: drift back to post, look around
@@ -392,7 +400,7 @@ export class Actor {
 
 export class Actors {
   constructor() {
-    this.list = []; this.mines = []; this.pickups = []; this.timers = []; this.props = []; this.corpses = []; this.navBudget = 2; this.coverBudget = 1; this.barkT = 0;
+    this.list = []; this.mines = []; this.pickups = []; this.timers = []; this.props = []; this.corpses = []; this.navBudget = 2; this.coverBudget = 1; this.barkT = 0; this.onPlayer = 0;
     const mg = new GB(1); mg.cyl(0x2d2f2a, 0.2, 0.26, 0.06, 0, 0.03, 0, 0, 0, 0, 14); mg.cyl(0x3a3d36, 0.08, 0.08, 0.03, 0, 0.07, 0, 0, 0, 0, 10); for (let i = 0; i < 6; i++) mg.box(0x1a1b18, 0.03, 0.02, 0.05, Math.cos(i * 1.047) * 0.17, 0.06, Math.sin(i * 1.047) * 0.17, 0, -i * 1.047, 0);
     this.mineGeo = mg.build(8); this.mineMat = modelMats().metal;
     const mk = (body, band, cross) => { const g = new GB(1); g.rbox(body, 0.34, 0.2, 0.24, 0, 0, 0, 0, 0, 0, 0.3); g.rbox(band, 0.345, 0.03, 0.245, 0, 0.06, 0); g.box(0x17181a, 0.08, 0.02, 0.02, 0, 0.11, 0); g.box(cross, 0.1, 0.03, 0.004, 0, 0, 0.121); if (cross === 0xc02018) g.box(cross, 0.03, 0.1, 0.004, 0, 0, 0.121); else for (let i = 0; i < 3; i++) g.cyl(0xc09a45, 0.012, 0.012, 0.05, -0.05 + i * 0.05, 0.02, 0.123, 0, 0, 0, 6); return g.build(8); };
@@ -420,6 +428,7 @@ export class Actors {
   detonate(m) { m.dead = true; G.r3.scene.remove(m.mesh); G.combat.explosion(m.x, m.y + 0.2, m.z, 4.6, 170, null, m.team); }
   update(dt) {
     this.navBudget = 2; this.coverBudget = 1; this.barkT -= dt;
+    this.onPlayer = 0; for (const a of this.list) if (!a.dead && a.team !== 0 && a.burst > 0 && a.target === G.player && !a.T.static) this.onPlayer++;
     if (G.world.navDirty) { this.navT = (this.navT || 0) - dt; if (this.navT <= 0) { G.nav.rebuild(G.world); G.world.navDirty = false; this.navT = 0.5; } }
     for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; t.t -= dt; if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); } }
     for (let i = this.list.length - 1; i >= 0; i--) { const a = this.list[i]; if (!a.update(dt)) { a.remove(); this.list.splice(i, 1); const k = this.corpses.indexOf(a); if (k >= 0) this.corpses.splice(k, 1); } }
