@@ -68,7 +68,7 @@ class PSys {
   clear() { this.n = 0; this.geo.setDrawRange(0, 0); }
 }
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _col = new THREE.Color();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d2 = new THREE.Vector3(), _col = new THREE.Color();
 
 export class FX {
   constructor(scene) {
@@ -79,7 +79,7 @@ export class FX {
     this.light = 1;                // ambient brightness for smoke/dust
     this.fires = [];
     // tracers: camera-facing quads
-    const TN = 48;
+    const TN = 160; this.segMax = TN; this.segs = [];
     this.tr = []; this.trPos = new Float32Array(TN * 12); this.trCol = new Float32Array(TN * 16);
     const tg = new THREE.BufferGeometry(); const idx = [];
     for (let i = 0; i < TN; i++) { idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 2, i * 4 + 1, i * 4 + 3); this.tr.push({ t: 0 }); }
@@ -189,11 +189,9 @@ export class FX {
   heal(x, y, z) { for (let i = 0; i < 10; i++) this.fireP.add(x + rand(-0.4, 0.4), y + rand(0, 1.5), z + rand(-0.4, 0.4), 0, rand(0.5, 1.5), 0, rand(0.5, 1), 0.12, 0.02, 0.3, 1, 0.4, 0.8, 0); }
   goldBurst(x, y, z) { for (let i = 0; i < 10; i++) this.fireP.add(x, y, z, rand(-2, 2), rand(1, 4), rand(-2, 2), rand(0.4, 0.9), 0.12, 0.02, 1, 0.8, 0.2, 1, 0, 9); }
 
-  tracer(ax, ay, az, bx, by, bz, r = 1, g = 0.85, b = 0.5, width = 0.035) {
-    const t = this.tr[this.trNext]; this.trNext = (this.trNext + 1) % this.tr.length;
-    const len = Math.hypot(bx - ax, by - ay, bz - az);
-    t.ax = ax; t.ay = ay; t.az = az; t.dx = (bx - ax) / len; t.dy = (by - ay) / len; t.dz = (bz - az) / len; t.len = len; t.head = Math.min(len, 2.5); t.t = 1; t.r = r; t.g = g; t.b = b; t.w = width;
-  }
+  // immediate-mode glowing streak, drawn for one frame (bullet tracers, aiming lasers)
+  seg(ax, ay, az, bx, by, bz, r = 1, g = 0.85, b = 0.5, width = 0.03, alpha = 1) { if (this.segs.length < this.segMax * 11) this.segs.push(ax, ay, az, bx, by, bz, r, g, b, width, alpha); }
+  tracer(ax, ay, az, bx, by, bz, r = 1, g = 0.85, b = 0.5, width = 0.03) { this.seg(ax, ay, az, bx, by, bz, r, g, b, width, 1); }
 
   update(dt, cam) {
     this.smoke.mat.uniforms.uScale.value = this.fireP.mat.uniforms.uScale.value = G.r3.renderer.domElement.height / (2 * Math.tan(cam.fov * Math.PI / 360));
@@ -204,25 +202,22 @@ export class FX {
       if (f.acc > 0.07) { f.acc = 0; this.fireP.add(f.x + rand(-0.5, 0.5), f.y, f.z + rand(-0.5, 0.5), rand(-0.2, 0.2), rand(1, 2.4), rand(-0.2, 0.2), rand(0.35, 0.7), rand(0.6, 1), 0.2, 1, rand(0.4, 0.6), 0.1, 0.7, 3, 0, 0.5, 0.2);
         if (Math.random() < 0.4) { const L = this.light; this.smoke.add(f.x, f.y + 0.8, f.z, rand(-0.3, 0.3), rand(1.5, 2.5), rand(-0.3, 0.3), rand(2, 3.5), 0.8, 3, 0.1 * L + 0.02, 0.1 * L + 0.02, 0.1 * L + 0.02, 0.4, 1, -0.3, 0.5); } }
     }
-    // tracers
-    const P = this.trPos, C = this.trCol, cp = cam.position;
-    for (let i = 0; i < this.tr.length; i++) {
-      const t = this.tr[i], o = i * 12, oc = i * 16;
-      if (t.t <= 0) { for (let k = 0; k < 16; k++) C[oc + k] = 0; continue; }
-      t.head += dt * 320;
-      if (t.head >= t.len + 7) { t.t = 0; for (let k = 0; k < 16; k++) C[oc + k] = 0; continue; }
-      const h = Math.min(t.head, t.len), tl = Math.max(0, t.head - 7);
-      if (tl >= t.len) { t.t = 0; continue; }
-      _a.set(t.ax + t.dx * tl, t.ay + t.dy * tl, t.az + t.dz * tl); _b.set(t.ax + t.dx * h, t.ay + t.dy * h, t.az + t.dz * h);
-      _c.set(t.dx, t.dy, t.dz).cross(new THREE.Vector3().subVectors(cp, _a)).normalize().multiplyScalar(t.w * (1 + _a.distanceTo(cp) * 0.02));
+    // tracer streaks: camera-facing quads rebuilt from this frame's segments
+    const P = this.trPos, C = this.trCol, cp = cam.position, S = this.segs, n = Math.min(this.segMax, S.length / 11);
+    for (let i = 0; i < n; i++) {
+      const k = i * 11, o = i * 12, oc = i * 16;
+      _a.set(S[k], S[k + 1], S[k + 2]); _b.set(S[k + 3], S[k + 4], S[k + 5]);
+      _c.subVectors(_b, _a).cross(_d2.subVectors(cp, _a)); const cl = _c.length(); if (cl < 1e-6) _c.set(0, 1, 0); else _c.multiplyScalar(1 / cl);
+      const w = S[k + 9] * (1 + _b.distanceTo(cp) * 0.035); _c.multiplyScalar(w);
       P[o] = _a.x - _c.x; P[o + 1] = _a.y - _c.y; P[o + 2] = _a.z - _c.z; P[o + 3] = _a.x + _c.x; P[o + 4] = _a.y + _c.y; P[o + 5] = _a.z + _c.z;
       P[o + 6] = _b.x - _c.x; P[o + 7] = _b.y - _c.y; P[o + 8] = _b.z - _c.z; P[o + 9] = _b.x + _c.x; P[o + 10] = _b.y + _c.y; P[o + 11] = _b.z + _c.z;
-      for (let v = 0; v < 4; v++) { C[oc + v * 4] = t.r * 2; C[oc + v * 4 + 1] = t.g * 2; C[oc + v * 4 + 2] = t.b * 2; C[oc + v * 4 + 3] = v < 2 ? 0 : 1; }
+      for (let v = 0; v < 4; v++) { C[oc + v * 4] = S[k + 6] * 2.2; C[oc + v * 4 + 1] = S[k + 7] * 2.2; C[oc + v * 4 + 2] = S[k + 8] * 2.2; C[oc + v * 4 + 3] = (v < 2 ? 0.15 : 1) * S[k + 10]; }
     }
+    this.trMesh.geometry.setDrawRange(0, n * 6); S.length = 0;
     this.trMesh.geometry.attributes.position.needsUpdate = true; this.trMesh.geometry.attributes.color.needsUpdate = true;
     this.rainU.uTime.value += dt; this.rainU.uCam.value.copy(cp);
     this.moteU.uTime.value += dt; this.moteU.uCam.value.copy(cp);
   }
 
-  clear() { this.smoke.clear(); this.fireP.clear(); this.fires.length = 0; for (const t of this.tr) t.t = 0; }
+  clear() { this.smoke.clear(); this.fireP.clear(); this.fires.length = 0; this.segs.length = 0; }
 }

@@ -213,8 +213,8 @@ function step(rdt, real) {
     G.menuT += rdt; const a = G.menuT * 0.045 + 0.6, R = 31 + Math.sin(G.menuT * 0.07) * 5;
     cam.position.set(Math.sin(a) * R + 6, 8.5 + Math.sin(G.menuT * 0.05) * 3, Math.cos(a) * R + 2); cam.lookAt(6, 3, 2);
     if (cam.fov !== 50) { cam.fov = 50; cam.updateProjectionMatrix(); }
-    G.actors.update(rdt); m.update(rdt); G.world.update(rdt); G.terrain.update(rdt); G.fx.update(rdt, cam);
-    r3.focus.set(0, 0, 0); r3.update(rdt); r3.render(); G.audio.update(rdt);
+    G.actors.update(rdt); G.combat.update(rdt); m.update(rdt); G.world.update(rdt); G.terrain.update(rdt); G.fx.update(rdt, cam);
+    r3.focus.set(0, 0, 0); r3.fx.supp = 0; r3.update(rdt); r3.render(); G.audio.update(rdt);
     // one-off automatic quality calibration on first launch
     if (G.autoQuality && !document.hidden) { aqT += real; if (aqT > 1.2) { aqN++; aqSum += real; if (aqN >= 50) { const avg = aqSum / aqN; G.autoQuality = false; const q = avg > 0.05 ? 0 : avg > 0.03 ? 1 : 2; G.settings.quality = q; if (q !== r3.quality) { r3.setQuality(q); G.terrain.buildGrass(q); } G.game.save(); } } }
     return;
@@ -237,7 +237,7 @@ function step(rdt, real) {
   G.weapons.update(dt, p, active && !p.dead);
   // hold F: end raid / retire from defence
   if (active && m.state === 'play' && Input.keys.KeyF && (m.kind === 'raid' && (m.raidStars() > 0 || m.time > 20) || m.kind === 'defend' && m.waveState === 'wait' && m.wavesCleared > 0)) { m.endHold += real; if (m.endHold >= 1.2) m.end(true, 'retire'); } else m.endHold = 0;
-  G.actors.update(dt); m.update(dt); G.world.update(dt); G.terrain.update(dt); G.fx.update(dt, cam);
+  G.actors.update(dt); G.combat.update(dt); m.update(dt); G.world.update(dt); G.terrain.update(dt); G.fx.update(dt, cam);
   r3.fx.low = p.dead ? 1 : p.hp < 35 ? 1 - p.hp / 35 : 0;
   r3.focus.copy(p.pos); r3.update(dt);
   G.hud.update(rdt);

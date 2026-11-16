@@ -33,7 +33,7 @@ export class Mission {
 
   start() {
     const cfg = this.cfg, w = G.world;
-    G.actors.clear(); G.fx.clear(); G.terrain.resetTrees(); w.quiet = true; w.clear();
+    G.actors.clear(); G.fx.clear(); G.combat.clear(); G.terrain.resetTrees(); w.quiet = true; w.clear();
     const rt = this.rt = buildVillage(w, cfg.village, { tint: cfg.tint !== undefined ? cfg.tint : (cfg.legion ? 0x6a1410 : 0x2a5fa8), militia: false });
     G.terrain.updateSplat(w, rt.paths);
     G.r3.lampSources = rt.lamps.slice();

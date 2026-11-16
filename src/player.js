@@ -14,18 +14,20 @@ export class Player {
     this.slideT = 0; this.stepAcc = 0; this.bob = 0; this.bobAmt = 0; this.landDip = 0; this.stepSmooth = 0; this.roll = 0;
     this.recoilP = 0; this.recoilY = 0; this.recoilVP = 0; this.fovKick = 0; this.sprinting = false; this.moving = false; this.speed = 0;
     this.fallStart = 0; this.adsT = 0; this.speedMul = 1; this.fovMul = 1; this.invuln = 0; this.shake = 0; this.stats = { dmgTaken: 0 };
-    this.fwd = new THREE.Vector3(); this.eyePos = new THREE.Vector3();
+    this.fwd = new THREE.Vector3(); this.eyePos = new THREE.Vector3(0, 1.6, 46);
+    this.recAccP = 0; this.recAccY = 0; this.swayP = 0; this.swayY = 0; this.lean = 0; this.leanT = 0; this.strafe = 0; this.suppress = 0;
   }
   reset(x, z, yaw = 0) {
     this.pos.set(x, Math.max(terrainH(x, z), G.world.groundAt(x, z, 3)), z); this.vel.set(0, 0, 0); this.yaw = yaw; this.pitch = 0;
     this.hp = this.maxHp; this.dead = false; this.lastHurt = 99; this.crouch = false; this.slideT = 0; this.recoilP = this.recoilY = 0; this.invuln = 1.5; this.shake = 0;
+    this.recAccP = this.recAccY = 0; this.swayP = this.swayY = 0; this.lean = this.leanT = 0; this.suppress = 0; this.eyePos.set(x, this.pos.y + 1.6, z);
   }
   free(x, y, z, h) { return G.world.boxFree(x - R, y + 0.02, z - R, x + R, y + h - 0.02, z + R); }
 
   damage(amount, from, kind) {
     if (this.dead || this.invuln > 0 || G.godMode) return;
     amount *= G.diffDmg || 1;
-    this.hp -= amount; this.lastHurt = 0; this.stats.dmgTaken += amount;
+    this.hp -= amount; this.lastHurt = 0; this.stats.dmgTaken += amount; this.recoilVP += (Math.random() - 0.3) * Math.min(1.2, amount / 20); this.recoilY += (Math.random() - 0.5) * Math.min(0.05, amount / 500);
     G.r3.fx.damage = Math.min(1, G.r3.fx.damage + amount / 45);
     this.shake = Math.min(1.2, this.shake + amount / 60);
     if (G.audio) G.audio.hurt();
@@ -40,7 +42,10 @@ export class Player {
     if (!this.dead && this.lastHurt > 4.5 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + 14 * dt);
     if (active && !this.dead) {
       const sens = 0.0022 * (s.sens || 1) * (1 - this.adsT * (1 - this.fovMul) * 0.9);
-      this.yaw -= inp.mdx * sens; this.pitch -= inp.mdy * sens * (s.invertY ? -1 : 1);
+      const dP = -inp.mdy * sens * (s.invertY ? -1 : 1);
+      this.yaw -= inp.mdx * sens; this.pitch += dP;
+      if (dP < 0 && this.recAccP > 0) this.recAccP = Math.max(0, this.recAccP + dP);      // you pulled the muzzle down yourself: less to settle
+      if (inp.mdx !== 0) this.recAccY *= 0.9;
       this.pitch = clamp(this.pitch, -1.5, 1.5);
     }
     // --- input
@@ -50,6 +55,10 @@ export class Player {
       if (inp.keys.KeyA || inp.keys.ArrowLeft) ix -= 1; if (inp.keys.KeyD || inp.keys.ArrowRight) ix += 1;
     }
     const il = Math.hypot(ix, iz); if (il > 0) { ix /= il; iz /= il; }
+    this.strafe = damp(this.strafe, ix, 8, dt);
+    // lean out of cover with Q / E
+    this.lean = active && !this.dead && this.onGround && !this.sprinting ? (inp.keys.KeyE ? 1 : 0) - (inp.keys.KeyQ ? 1 : 0) : 0;
+    this.leanT = damp(this.leanT, this.lean, 11, dt); this.suppress = Math.max(0, this.suppress - dt * 0.55);
     const wantCrouch = active && (inp.keys.ControlLeft || inp.keys.KeyC);
     const wantSprint = active && inp.keys.ShiftLeft && iz < 0 && !wantCrouch && this.adsT < 0.3;
     if (active && inp.pressed.KeyC || active && inp.pressed.ControlLeft) { if (this.sprinting && this.onGround && this.slideT <= 0 && this.speed > 5.5) { this.slideT = 0.75; } }
@@ -141,12 +150,17 @@ export class Player {
   applyCamera(cam, baseFov) {
     const bobY = Math.sin(this.bob * 2) * 0.028 * this.bobAmt * (1 - this.adsT * 0.7), bobX = Math.cos(this.bob) * 0.02 * this.bobAmt * (1 - this.adsT * 0.7);
     const sh = this.shake + G.r3.fx.shake;
-    this.eyePos.set(this.pos.x, this.pos.y + this.eye + this.stepSmooth - this.landDip + bobY, this.pos.z);
+    const ey = this.pos.y + this.eye + this.stepSmooth - this.landDip + bobY - Math.abs(this.leanT) * 0.07;
+    // leaning shifts the eye sideways as far as the wall beside you allows
+    const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw); let off = this.leanT * 0.36;
+    if (Math.abs(off) > 0.01) { const w = G.world; for (let k = 0; k < 3; k++) { const x = this.pos.x + rx * off, z = this.pos.z + rz * off; if (w.boxFree(x - 0.1, ey - 0.12, z - 0.1, x + 0.1, ey + 0.12, z + 0.1)) break; off *= 0.5; if (k === 2) off = 0; } }
+    this.eyePos.set(this.pos.x + rx * off, ey, this.pos.z + rz * off);
     cam.position.copy(this.eyePos);
-    cam.position.x += Math.cos(this.yaw) * bobX; cam.position.z += -Math.sin(this.yaw) * bobX;
-    cam.rotation.set(this.pitch + this.recoilP + rand(-1, 1) * sh * 0.02, this.yaw + this.recoilY + rand(-1, 1) * sh * 0.02, this.roll + rand(-1, 1) * sh * 0.015);
+    cam.position.x += rx * bobX; cam.position.z += rz * bobX;
+    cam.rotation.set(this.pitch + this.recoilP + this.swayP + rand(-1, 1) * sh * 0.02, this.yaw + this.recoilY + this.swayY + rand(-1, 1) * sh * 0.02, this.roll - this.leanT * 0.15 + rand(-1, 1) * sh * 0.015);
     const fov = lerp(baseFov + this.fovKick, baseFov * this.fovMul, this.adsT);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     cam.getWorldDirection(this.fwd);
+    G.r3.fx.supp = this.suppress;
   }
 }

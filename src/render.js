@@ -58,21 +58,21 @@ const FINAL_SHADER = {
   uniforms: {
     tDiffuse: { value: null }, uTime: { value: 0 }, uVignette: { value: 0.45 }, uGrain: { value: 0.03 }, uCA: { value: 0.22 },
     uDamage: { value: 0 }, uSat: { value: 1 }, uContrast: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
-    uFlash: { value: 0 }, uFade: { value: 0 }, uLow: { value: 0 }, uBars: { value: 0 },
+    uFlash: { value: 0 }, uFade: { value: 0 }, uLow: { value: 0 }, uBars: { value: 0 }, uSupp: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `varying vec2 vUv; uniform sampler2D tDiffuse;
-uniform float uTime, uVignette, uGrain, uCA, uDamage, uSat, uContrast, uFlash, uFade, uLow, uBars; uniform vec3 uTint;
+uniform float uTime, uVignette, uGrain, uCA, uDamage, uSat, uContrast, uFlash, uFade, uLow, uBars, uSupp; uniform vec3 uTint;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
 void main(){
   vec2 c = vUv - 0.5; float r2 = dot(c, c);
-  vec2 off = c * r2 * uCA * 0.02;
+  vec2 off = c * r2 * (uCA + uSupp * 2.5) * 0.02;
   vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col = mix(vec3(lum), col, uSat * (1.0 - uLow * 0.7));
+  col = mix(vec3(lum), col, uSat * (1.0 - uLow * 0.7) * (1.0 - uSupp * 0.4));
   col = max(vec3(0.0), (col - 0.18) * uContrast + 0.18);
   col *= uTint;
-  col *= 1.0 - uVignette * smoothstep(0.12, 0.85, r2 * 1.9);
+  col *= 1.0 - (uVignette + uSupp * 0.55) * smoothstep(0.12, 0.85, r2 * 1.9);
   float dv = smoothstep(0.08, 0.5, r2 * 1.4);
   col = mix(col, vec3(0.55, 0.02, 0.0) * (0.4 + lum), clamp(uDamage * dv, 0.0, 0.85));
   col += (hash(vUv * vec2(1920.0, 1080.0) + fract(uTime) * 100.0) - 0.5) * uGrain * (0.35 + lum);
@@ -127,7 +127,7 @@ export class Renderer3D {
     this.lampSources = [];   // {x,y,z,color,intensity}
 
     this.env = ENVS.golden; this.envName = 'golden';
-    this.fx = { damage: 0, flash: 0, fade: 0, low: 0, bars: 0, lightning: 0, shake: 0 };
+    this.fx = { damage: 0, flash: 0, fade: 0, low: 0, bars: 0, lightning: 0, shake: 0, supp: 0 };
     this.quality = 2;
     this.focus = new THREE.Vector3();
     this.time = 0;
@@ -254,7 +254,7 @@ export class Renderer3D {
     this.sun.intensity = this.env.sunI + lg * 9;
     f.damage = damp(f.damage, 0, 2.2, dt); f.flash = damp(f.flash, 0, 5, dt);
     const u = this.final.uniforms;
-    u.uTime.value = this.time; u.uDamage.value = f.damage; u.uFlash.value = f.flash; u.uFade.value = f.fade; u.uLow.value = f.low; u.uBars.value = f.bars;
+    u.uTime.value = this.time; u.uDamage.value = f.damage; u.uFlash.value = f.flash; u.uFade.value = f.fade; u.uLow.value = f.low; u.uBars.value = f.bars; u.uSupp.value = f.supp;
   }
 
   render() { this.composer.render(); }
