@@ -31,7 +31,8 @@ export function loftGeo(sections, radial = 10, capTop = true, capBot = true) {
 }
 
 export class GB {
-  constructor() { this.pos = []; this.nor = []; this.col = []; this.count = 0; }
+  // detail 2 = close-up (first-person weapons), 1 = world models seen from a distance
+  constructor(detail = 2) { this.pos = []; this.nor = []; this.col = []; this.count = 0; this.detail = detail; }
   // add any BufferGeometry with a transform and a flat colour (hex or THREE.Color)
   add(geo, color, mat) {
     const g = geo.index ? geo.toNonIndexed() : geo, P = g.attributes.position.array, N = g.attributes.normal.array;
@@ -48,8 +49,8 @@ export class GB {
   box(color, w, h, d, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) { return this.add(prim('box', () => new THREE.BoxGeometry(1, 1, 1)), color, this.trs(x, y, z, rx, ry, rz, w, h, d)); }
   // box with chamfered long edges (reads as machined / moulded rather than a toy block)
   rbox(color, w, h, d, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, r = 0.22) {
-    const key = 'rbox' + r;
-    const g = prim(key, () => loftGeo([{ y: -0.5, rx: 0.5 - r * 0.25, rz: 0.5 - r * 0.25, e: 7 }, { y: -0.5 + r * 0.3, rx: 0.5, rz: 0.5, e: 7 }, { y: 0.5 - r * 0.3, rx: 0.5, rz: 0.5, e: 7 }, { y: 0.5, rx: 0.5 - r * 0.25, rz: 0.5 - r * 0.25, e: 7 }], 12));
+    const key = 'rbox' + r + ':' + this.detail;
+    const g = prim(key, () => loftGeo([{ y: -0.5, rx: 0.5 - r * 0.25, rz: 0.5 - r * 0.25, e: 7 }, { y: -0.5 + r * 0.3, rx: 0.5, rz: 0.5, e: 7 }, { y: 0.5 - r * 0.3, rx: 0.5, rz: 0.5, e: 7 }, { y: 0.5, rx: 0.5 - r * 0.25, rz: 0.5 - r * 0.25, e: 7 }], this.detail > 1 ? 12 : 8));
     return this.add(g, color, this.trs(x, y, z, rx, ry, rz, w, h, d));
   }
   // cylinder along local Y, then transformed
@@ -61,9 +62,9 @@ export class GB {
   // cylinder whose axis runs along Z (barrels, tubes, scopes)
   cylZ(color, r, len, x, y, z, seg = 12, r2) { return this.cyl(color, r2 === undefined ? r : r2, r, len, x, y, z, Math.PI / 2, 0, 0, seg); }
   cylX(color, r, len, x, y, z, seg = 10) { return this.cyl(color, r, r, len, x, y, z, 0, 0, Math.PI / 2, seg); }
-  sph(color, rx, ry, rz, x = 0, y = 0, z = 0, seg = 10) { return this.add(prim('sph' + seg, () => new THREE.SphereGeometry(1, seg, Math.max(6, seg - 2))), color, this.trs(x, y, z, 0, 0, 0, rx, ry, rz)); }
+  sph(color, rx, ry, rz, x = 0, y = 0, z = 0, seg = 10) { if (this.detail < 2) seg = Math.min(seg, 7); return this.add(prim('sph' + seg, () => new THREE.SphereGeometry(1, seg, Math.max(4, seg - 3))), color, this.trs(x, y, z, 0, 0, 0, rx, ry, rz)); }
   dome(color, rx, ry, rz, x = 0, y = 0, z = 0, rxr = 0, ryr = 0, rzr = 0) { return this.add(prim('dome', () => new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5)), color, this.trs(x, y, z, rxr, ryr, rzr, rx, ry, rz)); }
-  torus(color, R, r, x, y, z, rx = 0, ry = 0, rz = 0, arc = Math.PI * 2) { const k = 'tor' + (r / R).toFixed(3) + ':' + arc.toFixed(2); return this.add(prim(k, () => new THREE.TorusGeometry(1, r / R, 6, 14, arc)), color, this.trs(x, y, z, rx, ry, rz, R, R, R)); }
+  torus(color, R, r, x, y, z, rx = 0, ry = 0, rz = 0, arc = Math.PI * 2) { const hi = this.detail > 1, k = 'tor' + (r / R).toFixed(3) + ':' + arc.toFixed(2) + hi; return this.add(prim(k, () => new THREE.TorusGeometry(1, r / R, hi ? 6 : 4, hi ? 14 : 9, arc)), color, this.trs(x, y, z, rx, ry, rz, R, R, R)); }
   cone(color, r, len, x, y, z, rx = 0, ry = 0, rz = 0, seg = 10) { return this.add(prim('cone' + seg, () => new THREE.ConeGeometry(1, 1, seg)), color, this.trs(x, y, z, rx, ry, rz, r, len, r)); }
   // tapered tube between two points (limbs, straps, slings)
   tube(color, r1, r2, ax, ay, az, bx, by, bz, seg = 10) {
@@ -74,7 +75,7 @@ export class GB {
     return this.add(g, color, m);
   }
   // capsule-ish limb: tube plus rounded ends
-  limb(color, r1, r2, ax, ay, az, bx, by, bz, seg = 10) { this.tube(color, r1, r2, ax, ay, az, bx, by, bz, seg); this.sph(color, r1, r1, r1, ax, ay, az, 8); this.sph(color, r2, r2, r2, bx, by, bz, 8); return this; }
+  limb(color, r1, r2, ax, ay, az, bx, by, bz, seg = 10) { if (this.detail < 2) seg = Math.min(seg, 8); this.tube(color, r1, r2, ax, ay, az, bx, by, bz, seg); this.sph(color, r1, r1, r1, ax, ay, az, 6); this.sph(color, r2, r2, r2, bx, by, bz, 6); return this; }
   loft(color, sections, radial = 10, mat = null, capTop = true, capBot = true) { return this.add(loftGeo(sections, radial, capTop, capBot), color, mat); }
   // extruded 2D side profile. Profile X runs along -Z (forward), profile Y is up; thickness is centred on X.
   profile(color, pts, thick, x = 0, y = 0, z = 0, bevel = 0.004, holes = null) {

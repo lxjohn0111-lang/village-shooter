@@ -10,9 +10,10 @@ export class HUD {
   constructor() {
     this.el = $('hud'); this.x = $('xhair'); this.hit = $('hitm'); this.objs = $('objs'); this.feedEl = $('feed'); this.bannerEl = $('banner'); this.toastEl = $('toast');
     this.sub = $('subtitle'); this.radar = $('radar').getContext('2d'); this.markers = $('markers'); this.dmgdir = $('dmgdir'); this.dmgnums = $('dmgnums');
+    this.barks = []; this.cook = document.createElement('div'); this.cook.id = 'cook'; this.el.appendChild(this.cook); this.breathEl = document.createElement('div'); this.breathEl.id = 'breath'; this.breathEl.innerHTML = '<i></i>'; this.el.appendChild(this.breathEl);
     this.hitT = 0; this.toastT = 0; this.toastKey = ''; this.bannerT = 0; this.subT = 0; this.streakT = 0; this.dirs = []; this.slow = 0; this.cache = {}; this.markerEls = []; this.warnT = 0; this.promptText = '';
   }
-  show(on) { this.el.classList.toggle('hidden', !on); if (on) { this.feedEl.innerHTML = ''; this.dmgnums.innerHTML = ''; this.cache = {}; this.bannerEl.classList.remove('on'); this.sub.classList.remove('on'); this.toastEl.style.opacity = 0; $('streak').style.opacity = 0; for (const d of this.dirs) d.el.remove(); this.dirs = []; } }
+  show(on) { this.el.classList.toggle('hidden', !on); if (on) { this.feedEl.innerHTML = ''; this.dmgnums.innerHTML = ''; this.cache = {}; this.bannerEl.classList.remove('on'); this.sub.classList.remove('on'); this.toastEl.style.opacity = 0; $('streak').style.opacity = 0; for (const d of this.dirs) d.el.remove(); this.dirs = []; for (const b of this.barks) b.el.remove(); this.barks = []; this.cook.style.display = 'none'; this.breathEl.style.display = 'none'; } }
   set(id, key, html) { if (this.cache[key] !== html) { this.cache[key] = html; (typeof id === 'string' ? $(id) : id).innerHTML = html; } }
 
   toast(text, dur = 1.5, key = '') { if (G.build && G.build.active) { const e = $('b-toast'); e.textContent = text; e.style.opacity = 1; this.bToastT = dur; return; } this.toastEl.textContent = text; this.toastEl.style.opacity = 1; this.toastT = dur; this.toastKey = key; }
@@ -24,6 +25,8 @@ export class HUD {
   damageNumber(a, amount) { if (this.dmgnums.children.length > 14) return; _v.set(a.pos.x, a.pos.y + a.height + 0.1, a.pos.z).project(G.r3.camera); if (_v.z > 1) return; const i = document.createElement('i'); i.textContent = Math.round(amount); if (amount > 90) i.className = 'h'; i.style.left = ((_v.x * 0.5 + 0.5) * innerWidth + (Math.random() - 0.5) * 30) + 'px'; i.style.top = ((-_v.y * 0.5 + 0.5) * innerHeight) + 'px'; this.dmgnums.appendChild(i); setTimeout(() => i.remove(), 700); }
   damageFrom(from, player) { if (!from) return; const el = document.createElement('i'); this.dmgdir.appendChild(el); this.dirs.push({ el, x: from.x, z: from.z, t: 1.4 }); if (this.dirs.length > 5) { this.dirs.shift().el.remove(); } }
   sniperWarn(a, f) { this.warnT = 0.2; const w = $('warn'); w.textContent = '◆ MARKSMAN AIMING ◆'; w.style.opacity = 0.4 + f * 0.6; }
+  // short shouted callouts floating over a soldier's head ("RELOADING!", "FRAG OUT!")
+  bark(a, text) { if (this.el.classList.contains('hidden')) return; const p = G.player; if (!p || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) > 45) return; const el = document.createElement('i'); el.className = 'bark' + (a.team === 0 ? ' ally' : ''); el.textContent = text; this.markers.appendChild(el); this.barks.push({ a, el, t: 1.7 }); if (this.barks.length > 4) this.barks.shift().el.remove(); }
   prompt(html) { const p = $('prompt'); if (html !== this.promptText) { this.promptText = html; p.innerHTML = html; p.style.display = html ? 'block' : 'none'; } }
 
   update(dt) {
@@ -51,9 +54,13 @@ export class HUD {
     this.set($('ammo').querySelector('.wname'), 'wn', d.name.toUpperCase() + ((w.levels[w.id] || 1) > 1 ? '  MK ' + ['', 'I', 'II', 'III', 'IV', 'V'][w.levels[w.id]] : ''));
     const magEl = $('ammo').querySelector('.mag');
     this.set(magEl, 'mag', d.melee ? '—' : String(a.mag)); magEl.classList.toggle('low', !d.melee && a.mag <= w.stats.mag * 0.25);
-    this.set($('ammo').querySelector('.res'), 'res', d.melee ? '' : (w.reloadT >= 0 ? 'RELOADING' : '/ ' + (a.reserve > 9000 ? '∞' : a.reserve)));
+    this.set($('ammo').querySelector('.res'), 'res', d.melee ? '' : (w.reloadT >= 0 ? (w.reloadTac ? 'TACTICAL RELOAD' : 'RELOADING') : '/ ' + (a.reserve > 9000 ? '∞' : a.reserve)));
     this.set($('ammo').querySelector('.slots'), 'sl' + w.cur + w.slots.join(), w.slots.map((id, i) => `<span>${i === w.cur ? '<b>' : ''}${i + 1} ${WEAPONS[id].cls.toUpperCase()}${i === w.cur ? '</b>' : ''}</span>`).join(''));
-    this.set($('ammo').querySelector('.nades'), 'nd', 'G  FRAG ×' + w.grenades);
+    this.set($('ammo').querySelector('.nades'), 'nd', 'G  FRAG ×' + w.grenades + '   V  MELEE   Q/E  LEAN');
+    // callouts, grenade cook timer, breath meter
+    for (let i = this.barks.length - 1; i >= 0; i--) { const b = this.barks[i]; b.t -= dt; if (b.t <= 0 || b.a.dead) { b.el.remove(); this.barks.splice(i, 1); continue; } _v.set(b.a.pos.x, b.a.pos.y + b.a.height + 0.25, b.a.pos.z).project(cam); if (_v.z > 1) { b.el.style.display = 'none'; continue; } b.el.style.display = 'block'; b.el.style.left = ((_v.x * 0.5 + 0.5) * innerWidth) + 'px'; b.el.style.top = ((-_v.y * 0.5 + 0.5) * innerHeight - (1.7 - b.t) * 14) + 'px'; b.el.style.opacity = Math.min(1, b.t * 2); }
+    if (w.cookT >= 0) { const left = Math.max(0, 3.2 - w.cookT); this.cook.style.display = 'block'; this.cook.textContent = 'COOKING  ' + left.toFixed(1) + 's — RELEASE G TO THROW'; this.cook.style.color = left < 1 ? '#ff4030' : '#ffd24a'; } else if (this.cook.style.display !== 'none') this.cook.style.display = 'none';
+    if (d.scope && w.adsT > 0.9) { this.breathEl.style.display = 'block'; const bi = this.breathEl.firstChild; bi.style.width = (w.breath * 100) + '%'; bi.style.background = w.winded ? '#ff4030' : w.holding ? '#6fe07f' : '#fff'; } else if (this.breathEl.style.display !== 'none') this.breathEl.style.display = 'none';
     this.slow -= dt; if (this.slow > 0) { this.drawMarkers(m, cam); return; } this.slow = 0.12;
     // objectives
     let h = '<div class="t">' + (m.kind === 'raid' ? 'RAID — ' + (m.cfg.rival ? m.cfg.rival.name.toUpperCase() : '') : m.kind === 'defend' ? 'VILLAGE DEFENCE' : (m.cfg.title || '').toUpperCase()) + '</div>';
@@ -92,6 +99,8 @@ export class HUD {
 
   drawMarkers(m, cam) {
     const list = m.state === 'play' || m.state === 'winning' ? m.markers() : [], els = this.markerEls;
+    // live enemy grenades close enough to hurt
+    if (G.weapons) for (const pr of G.weapons.projectiles) if (pr.type === 'frag' && pr.team !== 0 && Math.hypot(pr.pos.x - G.player.pos.x, pr.pos.z - G.player.pos.z) < 11) list.push({ x: pr.pos.x, y: pr.pos.y + 0.3, z: pr.pos.z, label: 'GRENADE', col: '#ff3020' });
     while (els.length < list.length) { const i = document.createElement('i'); this.markers.appendChild(i); els.push(i); }
     const W = innerWidth, H = innerHeight, p = G.player.pos;
     for (let k = 0; k < els.length; k++) {

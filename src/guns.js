@@ -95,7 +95,7 @@ const BUILD = {
     // buffer tube + stock
     g.cylZ(C.park, 0.0145, 0.2, 0, 0.052, 0.2, 10); g.cylZ(C.steel, 0.019, 0.012, 0, 0.052, 0.108, 10); stockSkeleton(pl, C.poly);
     const sy = redDot(p, 0.092, -0.04);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.7], eject: [0.03, 0.066, -0.05], grip: [0, -0.03, 0.058], fore: [0, -0.02, -0.3], foreV: true, adsY: -sy, adsZ: -0.3, hip: [0.19, -0.185, -0.52], butt: [0, 0.03, 0.31] });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.7], eject: [0.03, 0.066, -0.05], grip: [0, -0.03, 0.058], fore: [0, -0.02, -0.3], foreV: true, adsY: -sy, adsZ: -0.2, hip: [0.15, -0.165, -0.31], butt: [0, 0.03, 0.31] });
   },
 
   smg(p) {
@@ -117,7 +117,7 @@ const BUILD = {
     for (const s of [-1, 1]) g.tube(C.park, 0.0048, 0.0048, s * 0.016, 0.07, 0.06, s * 0.016, 0.07, 0.27, 8); g.rbox(C.park, 0.044, 0.02, 0.02, 0, 0.07, 0.06);
     g.rbox(C.rubber, 0.044, 0.1, 0.016, 0, 0.035, 0.275); g.tube(C.park, 0.0048, 0.0048, 0, 0.07, 0.27, 0, -0.01, 0.27, 8);
     const sy = holo(p, 0.091, -0.06);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.51], eject: [0.03, 0.06, -0.07], grip: [0, -0.03, 0.058], fore: [0, 0.0, -0.3], foreV: true, adsY: -sy, adsZ: -0.3, hip: [0.18, -0.18, -0.5], butt: [0, 0.03, 0.28] });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.51], eject: [0.03, 0.06, -0.07], grip: [0, -0.03, 0.058], fore: [0, 0.0, -0.3], foreV: true, adsY: -sy, adsZ: -0.2, hip: [0.15, -0.16, -0.3], butt: [0, 0.03, 0.28] });
   },
 
   shotgun(p) {
@@ -137,7 +137,7 @@ const BUILD = {
     p.body.poly.rbox(C.rubber, 0.042, 0.125, 0.018, 0, -0.03, 0.342);
     // side saddle with spare shells
     g.rbox(C.park, 0.008, 0.04, 0.13, -0.027, 0.04, -0.07); for (let i = 0; i < 5; i++) { g.cyl(C.shell, 0.0095, 0.0095, 0.05, -0.036, 0.046, -0.02 - i * 0.025, 0, 0, 0, 8); g.cyl(C.brass, 0.0098, 0.0098, 0.012, -0.036, 0.016, -0.02 - i * 0.025, 0, 0, 0, 8); }
-    Object.assign(p.pts, { muzzle: [0, BY, -0.82], eject: [0.03, 0.046, -0.06], grip: [0, -0.035, 0.07], fore: [0, 0.0, -0.36], foreV: false, adsY: -0.074, adsZ: -0.28, hip: [0.19, -0.18, -0.5], butt: [0, 0, 0.35] });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.82], eject: [0.03, 0.046, -0.06], grip: [0, -0.035, 0.07], fore: [0, 0.0, -0.36], foreV: false, adsY: -0.074, adsZ: -0.2, hip: [0.15, -0.16, -0.31], butt: [0, 0, 0.35] });
   },
 
   sniper(p) {
@@ -157,7 +157,7 @@ const BUILD = {
     p.mag.metal.profile(C.black, [[0.03, -0.012], [0.11, -0.012], [0.108, -0.075], [0.034, -0.08]], 0.03, 0, 0, 0, 0.004); p.mag.poly.box(C.rubber, 0.034, 0.008, 0.082, 0, -0.08, -0.07);
     bipod(g, 0.0, -0.33, 0);
     const sy = scope(p, 0.08, -0.05, 0.34);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.9], eject: [0.03, 0.056, -0.04], grip: [0, -0.035, 0.085], fore: [0, -0.012, -0.25], foreV: false, adsY: -sy, adsZ: -0.1, hip: [0.19, -0.19, -0.48], butt: [0, 0, 0.4], scopeZ: 0.13 });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.9], eject: [0.03, 0.056, -0.04], grip: [0, -0.035, 0.085], fore: [0, -0.012, -0.25], foreV: false, adsY: -sy, adsZ: -0.08, hip: [0.15, -0.17, -0.28], butt: [0, 0, 0.4], scopeZ: 0.13 });
   },
 
   lmg(p) {
@@ -178,7 +178,7 @@ const BUILD = {
     bipod(g, 0.02, -0.55, 0);
     pl.profile(C.poly, [[-0.08, 0.085], [-0.3, 0.08], [-0.31, -0.06], [-0.28, -0.07], [-0.2, -0.01], [-0.08, 0.0]], 0.05, 0, 0, 0, 0.007, [[[-0.13, 0.03], [-0.25, 0.0], [-0.27, 0.05], [-0.14, 0.06]]]); pl.rbox(C.rubber, 0.052, 0.14, 0.016, 0, 0.012, 0.315);
     const sy = holo(p, 0.113, -0.08);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.86], eject: [0.035, 0.03, -0.1], grip: [0, -0.03, 0.058], fore: [0, 0.004, -0.4], foreV: false, adsY: -sy, adsZ: -0.28, hip: [0.2, -0.2, -0.5], butt: [0, 0.01, 0.32] });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.86], eject: [0.035, 0.03, -0.1], grip: [0, -0.03, 0.058], fore: [0, 0.004, -0.4], foreV: false, adsY: -sy, adsZ: -0.2, hip: [0.16, -0.18, -0.3], butt: [0, 0.01, 0.32] });
   },
 
   launcher(p) {
@@ -193,7 +193,7 @@ const BUILD = {
     pl.rbox(C.poly, 0.03, 0.012, 0.05, 0, 0.022, -0.32); pl.cyl(C.poly, 0.014, 0.016, 0.08, 0, -0.022, -0.32, 0.1, 0, 0, 10);
     g.cylZ(C.park, 0.0145, 0.19, 0, 0.05, 0.19, 10); stockSkeleton(pl, C.poly, 0.1);
     const sy = redDot(p, 0.074, -0.02);
-    Object.assign(p.pts, { muzzle: [0, BY + 0.02, -0.47], eject: [0.04, 0.04, -0.1], grip: [0, -0.03, 0.058], fore: [0, -0.02, -0.32], foreV: true, adsY: -sy, adsZ: -0.28, hip: [0.19, -0.185, -0.5], butt: [0, 0.03, 0.3] });
+    Object.assign(p.pts, { muzzle: [0, BY + 0.02, -0.47], eject: [0.04, 0.04, -0.1], grip: [0, -0.03, 0.058], fore: [0, -0.02, -0.32], foreV: true, adsY: -sy, adsZ: -0.2, hip: [0.15, -0.165, -0.3], butt: [0, 0.03, 0.3] });
   },
 
   rocket(p) {
@@ -210,7 +210,7 @@ const BUILD = {
     // PG-7 style warhead (animated as "mag")
     const m = p.mag.metal; m.cylZ(C.od, 0.022, 0.12, 0, BY, -0.58, 12); m.cylZ(C.od, 0.048, 0.11, 0, BY, -0.685, 14, 0.022); m.cylZ(C.od, 0.048, 0.05, 0, BY, -0.765, 14); m.cylZ(C.od, 0.012, 0.13, 0, BY, -0.855, 14, 0.048);
     m.cylZ(C.bright, 0.006, 0.03, 0, BY, -0.932, 10, 0.012); m.torus(C.park, 0.0485, 0.0025, 0, BY, -0.765, 0, 0, 0); m.torus(0xc9a23a, 0.049, 0.002, 0, BY, -0.79, 0, 0, 0);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.95], eject: [0, 0, 0], grip: [0, -0.03, 0.058], fore: [0, -0.025, -0.22], foreV: true, adsY: -0.146, adsZ: -0.2, adsX: 0.0, hip: [0.17, -0.2, -0.42], butt: [0, 0.07, 0.3] });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.95], eject: [0, 0, 0], grip: [0, -0.03, 0.058], fore: [0, -0.025, -0.22], foreV: true, adsY: -0.146, adsZ: -0.14, adsX: 0.0, hip: [0.14, -0.19, -0.26], butt: [0, 0.07, 0.3] });
   },
 
   pistol(p) {
@@ -227,7 +227,7 @@ const BUILD = {
     s.box(C.black, 0.014, 0.008, 0.008, 0, 0.066, 0.058); s.box(C.white, 0.003, 0.003, 0.001, 0.0042, 0.068, 0.0625); s.box(C.white, 0.003, 0.003, 0.001, -0.0042, 0.068, 0.0625); s.box(C.black, 0.004, 0.007, 0.01, 0, 0.0655, -0.112); s.box(C.white, 0.0028, 0.0028, 0.001, 0, 0.067, -0.1065);
     // magazine base (animated)
     p.mag.metal.box(C.park, 0.02, 0.09, 0.032, 0, -0.045, 0.038, 0.2); p.mag.poly.rbox(C.rubber, 0.03, 0.01, 0.046, 0, -0.092, 0.05, 0.2);
-    Object.assign(p.pts, { muzzle: [0, BY, -0.14], eject: [0.02, 0.055, -0.03], grip: [0, -0.04, 0.045], fore: [-0.012, -0.05, 0.036], foreV: true, adsY: -0.0705, adsZ: -0.38, hip: [0.16, -0.15, -0.5], butt: [0, 0, 0.07], oneHand: true });
+    Object.assign(p.pts, { muzzle: [0, BY, -0.14], eject: [0.02, 0.055, -0.03], grip: [0, -0.04, 0.045], fore: [-0.012, -0.05, 0.036], foreV: true, adsY: -0.0705, adsZ: -0.36, hip: [0.12, -0.13, -0.42], butt: [0, 0, 0.07], oneHand: true });
   },
 
   sledge(p) {

@@ -20,25 +20,26 @@ export const ETYPES = {
 };
 
 export const LOOKS = {
-  legion: { cloth: 0x393b3d, armor: 0x5e1d18, helmet: 0x26262a, accent: 0x8a1a12, gear: 0x3d3a34, masked: true },
+  legion: { cloth: 0x50535a, armor: 0x7a2a22, helmet: 0x34353a, accent: 0xa82018, gear: 0x4a4640, masked: true },
   ally: { cloth: 0x4a5a48, armor: 0x5a5236, helmet: 0x4f5540, accent: 0x2f7fd0, gear: 0x7a6a48 },
   civilian: { cloth: 0x8a7a5c, armor: 0x6b5a3c, helmet: 0, accent: 0x8a7a5c },
 };
 export function clanLook(color) { const c = new THREE.Color(color).lerp(new THREE.Color(0x45443c), 0.66); return { cloth: c.getHex(), armor: 0x4c4a38, helmet: new THREE.Color(color).lerp(new THREE.Color(0x3c3f36), 0.8).getHex(), accent: color, gear: 0x6e6248 }; }
 
 const _v = new THREE.Vector3(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _t = new THREE.Vector3(), _e = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _eu = new THREE.Euler();
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _tg = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0), _pole = new THREE.Vector3(), _dir = new THREE.Vector3(), _perp = new THREE.Vector3(), _S = new THREE.Vector3();
 
 // two-bone IK in the torso's space: bend the arm (upper+fore, both hanging along -Y) so the hand reaches `target`
 function armIK(upper, fore, sx, target, a, b, side) {
-  _S.set(sx, RIG.shY, 0); _dir.subVectors(target, _S); let d = _dir.length(); if (d < 1e-4) return; _dir.multiplyScalar(1 / d);
+  _tg.copy(target); _S.set(sx, RIG.shY, 0); _dir.subVectors(_tg, _S); let d = _dir.length(); if (d < 1e-4) return; _dir.multiplyScalar(1 / d);
   d = clamp(d, Math.abs(a - b) + 0.02, a + b - 0.004);
   const ca = (a * a + d * d - b * b) / (2 * a * d), sa = Math.sqrt(Math.max(0, 1 - ca * ca));
   _pole.set(side * 0.75, -1, -0.35); _perp.copy(_pole).addScaledVector(_dir, -_pole.dot(_dir)).normalize();
   _e.copy(_S).addScaledVector(_dir, a * ca).addScaledVector(_perp, a * sa);                 // elbow
   _v.subVectors(_e, _S).normalize(); upper.quaternion.setFromUnitVectors(DOWN, _v);
   _t.copy(_S).addScaledVector(_dir, d).sub(_e).normalize();
-  _q.copy(upper.quaternion).invert(); _q2.setFromUnitVectors(DOWN, _t); fore.quaternion.multiplyQuaternions(_q, _q2);
+  _qa.copy(upper.quaternion).invert(); _qb.setFromUnitVectors(DOWN, _t); fore.quaternion.multiplyQuaternions(_qa, _qb);
 }
 
 export class Actor {
@@ -392,9 +393,9 @@ export class Actor {
 export class Actors {
   constructor() {
     this.list = []; this.mines = []; this.pickups = []; this.timers = []; this.props = []; this.corpses = []; this.navBudget = 2; this.coverBudget = 1; this.barkT = 0;
-    const mg = new GB(); mg.cyl(0x2d2f2a, 0.2, 0.26, 0.06, 0, 0.03, 0, 0, 0, 0, 14); mg.cyl(0x3a3d36, 0.08, 0.08, 0.03, 0, 0.07, 0, 0, 0, 0, 10); for (let i = 0; i < 6; i++) mg.box(0x1a1b18, 0.03, 0.02, 0.05, Math.cos(i * 1.047) * 0.17, 0.06, Math.sin(i * 1.047) * 0.17, 0, -i * 1.047, 0);
+    const mg = new GB(1); mg.cyl(0x2d2f2a, 0.2, 0.26, 0.06, 0, 0.03, 0, 0, 0, 0, 14); mg.cyl(0x3a3d36, 0.08, 0.08, 0.03, 0, 0.07, 0, 0, 0, 0, 10); for (let i = 0; i < 6; i++) mg.box(0x1a1b18, 0.03, 0.02, 0.05, Math.cos(i * 1.047) * 0.17, 0.06, Math.sin(i * 1.047) * 0.17, 0, -i * 1.047, 0);
     this.mineGeo = mg.build(8); this.mineMat = modelMats().metal;
-    const mk = (body, band, cross) => { const g = new GB(); g.rbox(body, 0.34, 0.2, 0.24, 0, 0, 0, 0, 0, 0, 0.3); g.rbox(band, 0.345, 0.03, 0.245, 0, 0.06, 0); g.box(0x17181a, 0.08, 0.02, 0.02, 0, 0.11, 0); g.box(cross, 0.1, 0.03, 0.004, 0, 0, 0.121); if (cross === 0xc02018) g.box(cross, 0.03, 0.1, 0.004, 0, 0, 0.121); else for (let i = 0; i < 3; i++) g.cyl(0xc09a45, 0.012, 0.012, 0.05, -0.05 + i * 0.05, 0.02, 0.123, 0, 0, 0, 6); return g.build(8); };
+    const mk = (body, band, cross) => { const g = new GB(1); g.rbox(body, 0.34, 0.2, 0.24, 0, 0, 0, 0, 0, 0, 0.3); g.rbox(band, 0.345, 0.03, 0.245, 0, 0.06, 0); g.box(0x17181a, 0.08, 0.02, 0.02, 0, 0.11, 0); g.box(cross, 0.1, 0.03, 0.004, 0, 0, 0.121); if (cross === 0xc02018) g.box(cross, 0.03, 0.1, 0.004, 0, 0, 0.121); else for (let i = 0; i < 3; i++) g.cyl(0xc09a45, 0.012, 0.012, 0.05, -0.05 + i * 0.05, 0.02, 0.123, 0, 0, 0, 6); return g.build(8); };
     this.pkGeo = { ammo: mk(0x4d5a36, 0x39402c, 0xd8d8d0), med: mk(0xdedede, 0xb8b8b8, 0xc02018) };
     this.pkMat = modelMats().poly;
   }

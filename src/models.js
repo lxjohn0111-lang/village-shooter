@@ -25,7 +25,7 @@ const KIT = {
 };
 
 function helmetGeo(kind, L) {
-  const g = new GB(), H = L.helmet || 0x4a4f3c, D = 0x16171a;
+  const g = new GB(1), H = L.helmet || 0x4a4f3c, D = 0x16171a;
   if (kind === 'combat') {
     g.loft(H, [{ y: 0.105, rx: 0.095, rz: 0.11, z: -0.006 }, { y: 0.145, rx: 0.099, rz: 0.116, z: -0.004 }, { y: 0.2, rx: 0.095, rz: 0.11, z: -0.006 }, { y: 0.245, rx: 0.072, rz: 0.086, z: -0.008 }, { y: 0.268, rx: 0.03, rz: 0.036, z: -0.008 }], 14);
     g.loft(shade(H, 0.8), [{ y: 0.1, rx: 0.1, rz: 0.116, z: -0.005 }, { y: 0.112, rx: 0.1005, rz: 0.1165, z: -0.005 }], 14, null, false, false);
@@ -73,7 +73,7 @@ function buildParts(type, L, v, rs) {
   const cloth = L.cloth, pants = shade(L.cloth, 0.8), vest = L.armor, gear = L.gear || mix(L.armor, 0x6e6248, 0.55), boot = 0x1f1a15, D = 0x17181a, glove = 0x26251f;
   const acc = L.accent === undefined ? 0x8a8a8a : L.accent, strap = shade(gear, 0.6);
   const helm = K.helm[v], pack = K.pack[v], rolled = K.rolled || (v === 1 && !K.vest2), bare = !!K.bare;
-  const g = {}; for (const k of ['hips', 'torso', 'head', 'upL', 'upR', 'foL', 'foR', 'thL', 'thR', 'shL', 'shR']) g[k] = new GB();
+  const g = {}; for (const k of ['hips', 'torso', 'head', 'upL', 'upR', 'foL', 'foR', 'thL', 'thR', 'shL', 'shR']) g[k] = new GB(1);
 
   // ---- hips
   let b = g.hips;
@@ -144,8 +144,8 @@ function buildParts(type, L, v, rs) {
     const hc = K.civilian ? skin : glove;
     fo.loft(hc, [{ y: -0.235, rx: 0.04, rz: 0.04 }, { y: -0.262, rx: 0.039, rz: 0.03 }], 10, null, false, false);
     fo.rbox(hc, 0.078, 0.088, 0.036, 0, -0.302, 0.006, 0, 0, 0, 0.5);
-    for (let i = 0; i < 4; i++) { const x = -0.028 + i * 0.019; fo.limb(hc, 0.0098, 0.009, x, -0.342, 0.008, x, -0.37, 0.03, 6); fo.limb(hc, 0.009, 0.0085, x, -0.37, 0.03, x, -0.352, 0.046, 6); }
-    fo.limb(hc, 0.0115, 0.01, s * -0.036, -0.285, 0.014, s * -0.05, -0.32, 0.036, 6); fo.limb(hc, 0.01, 0.009, s * -0.05, -0.32, 0.036, s * -0.036, -0.34, 0.05, 6);
+    for (let i = 0; i < 4; i++) { const x = -0.028 + i * 0.019; fo.tube(hc, 0.0105, 0.0095, x, -0.338, 0.008, x, -0.372, 0.031, 5); fo.tube(hc, 0.0095, 0.009, x, -0.372, 0.031, x, -0.35, 0.048, 5); }
+    fo.tube(hc, 0.012, 0.0105, s * -0.036, -0.282, 0.014, s * -0.05, -0.322, 0.036, 5); fo.tube(hc, 0.0105, 0.0095, s * -0.05, -0.322, 0.036, s * -0.036, -0.342, 0.05, 5);
     if (!K.civilian) for (let i = 0; i < 4; i++) fo.rbox(0x17181a, 0.015, 0.012, 0.008, -0.028 + i * 0.019, -0.338, -0.014);
     if (s > 0 && !K.civilian) { fo.rbox(0x16181a, 0.034, 0.012, 0.034, 0, -0.232, -0.04); fo.cyl(0x0c1418, 0.012, 0.012, 0.004, 0, -0.232, -0.048, Math.PI / 2, 0, 0, 8); }
   }
@@ -202,7 +202,7 @@ export function buildSoldier(type, look, variant, seed) {
 let turretGeo = null;
 export function buildTurret() {
   if (!turretGeo) {
-    const base = new GB(), sw = new GB(), head = new GB(), M0 = 0x3a3d42, BR = 0x8a6a2a, D = 0x17181a;
+    const base = new GB(1), sw = new GB(1), head = new GB(1), M0 = 0x3a3d42, BR = 0x8a6a2a, D = 0x17181a;
     base.cyl(M0, 0.2, 0.3, 0.08, 0, 0.04, 0, 0, 0, 0, 12); base.cyl(D, 0.1, 0.12, 0.14, 0, 0.14, 0, 0, 0, 0, 10);
     for (let i = 0; i < 3; i++) { const a = i * 2.094 + 0.5; base.tube(M0, 0.024, 0.018, Math.cos(a) * 0.08, 0.14, Math.sin(a) * 0.08, Math.cos(a) * 0.36, 0.02, Math.sin(a) * 0.36, 6); base.rbox(D, 0.09, 0.03, 0.09, Math.cos(a) * 0.37, 0.015, Math.sin(a) * 0.37); }
     sw.cyl(BR, 0.17, 0.2, 0.07, 0, 0.0, 0, 0, 0, 0, 14); for (let i = 0; i < 10; i++) sw.box(D, 0.02, 0.03, 0.02, Math.cos(i * 0.628) * 0.195, 0, Math.sin(i * 0.628) * 0.195, 0, -i * 0.628, 0);

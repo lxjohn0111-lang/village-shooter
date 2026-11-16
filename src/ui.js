@@ -152,7 +152,7 @@ export class UI {
       <div class="sec">Audio</div>${sl('master', 'Master volume', 0, 1, 0.01, true)}${sl('music', 'Music', 0, 1, 0.01, true)}${sl('sfx', 'Effects', 0, 1, 0.01, true)}
       <div class="sec">Controls</div>${sl('sens', 'Mouse sensitivity', 0.2, 3, 0.01, true)}
       <div class="sl"><span>Invert Y</span><div class="seg"><button class="${s.invertY ? 'on' : ''}" data-a="toggle" data-v="invertY">${s.invertY ? 'On' : 'Off'}</button></div><b></b></div>
-      <p class="brief"><b>WASD</b> move · <b>Shift</b> sprint · <b>C / Ctrl</b> crouch (while sprinting: slide) · <b>Space</b> jump / mantle · <b>LMB</b> fire · <b>RMB</b> aim · <b>R</b> reload · <b>1 2 3 / wheel / Q</b> weapons · <b>G</b> grenade · <b>V</b> sledge · <b>F</b> end raid · <b>Esc</b> pause</p>
+      <p class="brief"><b>WASD</b> move · <b>Shift</b> sprint (scoped: hold breath) · <b>C / Ctrl</b> crouch (while sprinting: slide) · <b>Space</b> jump / mantle · <b>Q / E</b> lean · <b>LMB</b> fire · <b>RMB</b> aim · <b>R</b> reload · <b>1 2 3 / wheel</b> weapons · <b>G</b> grenade (hold to cook) · <b>V</b> melee strike · <b>F</b> end raid · <b>Esc</b> pause</p>
       <div class="sec">Clan colour</div><div class="row">${CLAN_COLORS.map((c, i) => `<button class="chip" style="background:${hex(c)};width:26px;height:26px;${G.profile.color === i ? 'outline:2px solid #fff' : ''}" data-a="color" data-v="${i}"></button>`).join('')}</div>
       <div class="sec">Save</div><div class="row"><button class="btn sm" data-a="resetask">Reset all progress</button></div></div>`;
   }

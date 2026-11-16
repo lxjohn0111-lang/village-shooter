@@ -189,3 +189,11 @@ input[type=text]{background:rgba(0,0,0,.4);border:1px solid var(--line);color:va
 #b-toast{position:absolute;left:50%;top:60%;transform:translateX(-50%);font-size:14px;letter-spacing:.14em;opacity:0;transition:opacity .25s;text-shadow:0 1px 3px #000;pointer-events:none}
 @media (max-width:1000px){#side{width:240px;padding-left:20px}#logo .l1{font-size:30px}#panel{width:calc(100vw - 260px)}.tb{padding:5px 8px;font-size:13px}#b-help{display:none}}
 @media (max-height:640px){#nav{margin-top:14px}.nb{padding:8px 14px;font-size:15px}.nb small{display:none}#side{padding-top:16px}}
+
+#markers i.bark{font-size:11px;letter-spacing:.16em;color:#ffcf9a;font-weight:700;text-shadow:0 1px 3px #000,0 0 6px #000}
+#markers i.bark:before{display:none}
+#markers i.bark.ally{color:#9fd4ff}
+#cook{position:absolute;left:50%;top:56%;transform:translateX(-50%);font-size:13px;letter-spacing:.18em;font-weight:700;display:none;white-space:nowrap}
+#breath{position:absolute;left:50%;top:calc(50% + 30vh);transform:translateX(-50%);width:160px;height:4px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.3);display:none}
+#breath i{display:block;height:100%;background:#fff}
+#breath:after{content:"HOLD SHIFT TO STEADY";position:absolute;left:0;right:0;top:8px;text-align:center;font-size:9px;letter-spacing:.2em;color:#ccc}
