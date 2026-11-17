@@ -78,6 +78,7 @@ export class Mission {
     } else {
       for (let i = 0; i < 4; i++) { const p = freeSpot(rand(-14, 14), 0, rand(8, 22)); G.actors.spawn('guard', 0, p.x, p.y, p.z, { look: LOOKS.ally, yaw: rand(6.28) }); }
     }
+    if (this.cfg.exit && this.kind === 'story') this.faceExit();
     if (this.kind !== 'menu') this.spawnCast();
     const pl = G.player; pl.reset(this.spawn.x, this.spawn.z, this.spawn.yaw); pl.stats.dmgTaken = 0;
     if (G.profile && G.profile.bonds && (G.profile.bonds.ilka || 0) >= 3) { pl.maxHp = 120; pl.hp = 120; } else pl.maxHp = 100;
@@ -88,6 +89,17 @@ export class Mission {
     if (G.audio) { G.audio.setAmbience(G.r3.env.amb); }
   }
 
+  // start where the way to the exit is most open, looking down it
+  faceExit() {
+    const ex = this.cfg.exit, s0 = this.spawn, w = G.world; let best = null, bs = -1;
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * TAU * 3, r = (i / 40) * 7, x = s0.x + Math.cos(a) * r, z = s0.z + Math.sin(a) * r;
+      if (!w.boxFree(x - 0.4, 0.1, z - 0.4, x + 0.4, 1.8, z + 0.4)) continue;
+      const dx = ex.x - x, dz = ex.z - z, d = Math.hypot(dx, dz), h = w.raycast(x, 1.6, z, dx / d, 0, dz / d, 40), clear = h.id >= 0 ? h.t : 40;
+      if (clear > bs) { bs = clear; best = { x, z, yaw: Math.atan2(-dx, -dz) }; }
+    }
+    if (best) this.spawn = best;
+  }
   // named companions, villagers to escort, burning houses
   spawnCast() {
     const cfg = this.cfg;

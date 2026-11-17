@@ -130,6 +130,7 @@ export class HUD {
       if (behind) { x = W - x; y = H - 40; }
       const off = behind || x < 30 || x > W - 30 || y < 40 || y > H - 40;
       x = clamp(x, 30, W - 30); y = clamp(y, 40, H - 40);
+      if (mk.small && off) { e.style.display = 'none'; continue; }
       e.style.display = 'block'; e.style.left = x + 'px'; e.style.top = y + 'px'; e.style.color = mk.col; e.className = off ? 'off' : '';
       const txt = mk.label + '<small>' + Math.round(Math.hypot(mk.x - p.x, mk.z - p.z)) + ' m</small>'; if (e._t !== txt) { e._t = txt; e.innerHTML = txt; }
     }

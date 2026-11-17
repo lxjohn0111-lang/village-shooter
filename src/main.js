@@ -251,7 +251,7 @@ function step(rdt, real) {
   const dt = rdt * G.timeScale;
   const active = live && m.state !== 'ended' && m.state !== 'dead';
   if (m.kind === 'pvp' && m.phase === 'build') {
-    G.build.update(rdt); G.actors.update(dt); G.combat.update(dt); m.update(dt); G.world.update(dt); G.terrain.update(dt); G.fx.update(dt, cam);
+    G.weapons.holder.visible = false; G.build.update(rdt); G.actors.update(dt); G.combat.update(dt); m.update(dt); G.world.update(dt); G.terrain.update(dt); G.fx.update(dt, cam);
     r3.focus.copy(cam.position); r3.focus.y = 0; r3.update(dt); G.hud.update(rdt); G.hud.tickBuild(rdt); G.ui.buildTick(); r3.render(); G.audio.update(rdt);
     return;
   }
