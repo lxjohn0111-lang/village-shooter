@@ -84,7 +84,6 @@ Any Node host works (Fly.io, Render, Railway, a VPS). Browsers on HTTPS pages ne
 | `data.getItem / setItem` | Cloud save of the whole profile (falls back to `localStorage`). |
 | `user.getUser`, auth listener | Player name in the top bar. |
 | `game.settings.muteAudio` + settings listener | Respects the portal mute toggle. |
-| `game.getInviteParam('v')` | A village code passed in an invite link opens a "raid a friend" prompt. |
 
 ## Honest notes
 
