@@ -146,6 +146,7 @@ export class AudioSys {
   }
   treeFall(x, y, z) { if (!this.ok()) return; const t = this.ctx.currentTime, o = this.out(this.spatial(x, y, z, 30), 0.8, 0.4); for (let i = 0; i < 8; i++) this.nz(o, t + i * 0.09 + Math.random() * 0.05, 0.06, 'bandpass', rand(500, 1300), 300, 4, 0.7); this.nz(o, t + 1.2, 0.7, 'lowpass', 1500, 100, 0.7, 1, 0.02, this.brown); this.tone(o, t + 1.2, 0.3, 'sine', 80, 35, 0.9); }
   thunder() { if (!this.ok()) return; const t = this.ctx.currentTime + rand(0.2, 1.2), o = this.out(null, 0.9, 0.7); this.nz(o, t, 3.5, 'lowpass', 500, 50, 0.6, 1.2, 0.08, this.brown); this.nz(o, t, 0.4, 'lowpass', 3000, 300, 0.5, 0.6, 0.01); }
+  incoming(x, y, z) { if (!this.ok()) return; const t = this.ctx.currentTime, o = this.out(this.spatial(x, y, z, 30), 0.45, 0.4); this.tone(o, t, 1.3, 'sine', 1900, 520, 0.6, 0.15); this.tone(o, t, 1.3, 'sine', 1940, 540, 0.3, 0.15); }
   lowAmmo(f) { if (!this.ok()) return; const t = this.ctx.currentTime, o = this.out(null, 0.16, 0.05); this.tone(o, t, 0.05, 'triangle', 2600 + (1 - f) * 1400, 2300 + (1 - f) * 1200, 0.5); }
   ricochet(x, y, z) { if (!this.ok()) return; const sp = this.spatial(x, y, z, 12); if (sp.g < 0.04) return; const t = this.ctx.currentTime, o = this.out(sp, 0.35, 0.3), f = rand(2200, 3800); this.tone(o, t, 0.32, 'sine', f, f * rand(0.35, 0.6), 0.6, 0.004); this.tone(o, t, 0.2, 'triangle', f * 1.5, f * 0.7, 0.2, 0.004); }
   deathCry(x, y, z, scale = 1) {

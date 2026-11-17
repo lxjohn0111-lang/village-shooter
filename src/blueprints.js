@@ -364,6 +364,19 @@ function tentGen(b) {
   b.spawn('guard', w / 2, 0, d + 2); b.lamp(w / 2, 4, d + 1, 18);
 }
 
+// team Ember Shrine for multiplayer: a glowing stack of Ember stones on a plinth, ringed by waist-high stone
+function shrineGen(b) {
+  const w = b.w, c = w >> 1, tint = b.ctx.tint !== undefined ? b.ctx.tint : 0x2a5fa8;
+  b.fill(M.STONE, 1, 0, 1, w - 2, 1, w - 2, 2, 1, 2); b.fill(M.STONE, 4, 1, 4, w - 8, 1, w - 8, 2, 1, 2);
+  for (let i = 0; i < 6; i++) b.box(M.EMBER, c - 1, 2 + i * 2, c - 1, 2, 2, 2, F_CORE);
+  for (const [x, z] of [[c - 3, c - 3], [c + 2, c - 3], [c - 3, c + 2], [c + 2, c + 2]]) b.box(M.EMBER, x, 2, z, 1, 2, 1, F_CORE);
+  const gap = [[c - 3, c + 3, 0, 9]];
+  b.wall(M.STONE, 0, 1, 0, w, 4, 'x', { L: 4, open: gap }); b.wall(M.STONE, 0, 1, w - 1, w, 4, 'x', { L: 4, open: gap, phase: 1 });
+  b.wall(M.STONE, 0, 1, 1, w - 2, 4, 'z', { L: 4, open: gap, phase: 1 }); b.wall(M.STONE, w - 1, 1, 1, w - 2, 4, 'z', { L: 4, open: gap });
+  for (const [x, z] of [[0, 0], [w - 1, 0], [0, w - 1], [w - 1, w - 1]]) { b.post(M.TIMBER, x, 5, z, 10); b.box(M.CLOTH, x, 9, z, 1, 6, 1, 0, tint); }
+  b.meta.core = [c, 14, c]; b.lamp(c, 7, c, 70, 0xff7a22);
+}
+
 // --------------------------------------------------------------- catalogue
 // max = allowed count per Ember Hall level (1..5); prod = resource per hour
 export const BP = {
@@ -400,6 +413,7 @@ export const BP = {
   cage: { name: 'Prison Cage', cat: 'story', w: 10, d: 10, gen: cageGen, max: [0, 0, 0, 0, 0] },
   depot: { name: 'Supply Depot', cat: 'story', w: 20, d: 16, gen: depotGen, max: [0, 0, 0, 0, 0] },
   tent: { name: 'Legion Tent', cat: 'story', w: 14, d: 12, gen: tentGen, max: [0, 0, 0, 0, 0] },
+  shrine: { name: 'Ember Shrine', cat: 'story', w: 16, d: 16, gen: shrineGen, max: [0, 0, 0, 0, 0] },
 };
 for (const k in BP) BP[k].key = k;
 
@@ -441,6 +455,7 @@ function rotP(x, z, sx, sz, w, d, r) {
 export function stamp(world, rec, bid, ctx) {
   const bp = BP[rec.t]; if (!bp) return null;
   const seed = hashStr(rec.t) ^ (rec.x * 7919 + rec.z * 104729 + (rec.l || 1) * 31);
+  if (rec.c !== undefined) ctx = Object.assign({}, ctx, { tint: rec.c });
   const b = generate(rec.t, rec.l || 1, seed, ctx);
   const r = rec.r | 0, w = bp.w, d = bp.d;
   let core = 0;
@@ -568,17 +583,76 @@ export function genVillage(seed, level, opts = {}) {
 }
 
 // the hamlet a brand new player starts with
+// --------------------------------------------------------------- multiplayer maps
+export const TEAM_COLORS = [0x2f7fd0, 0xd0402f];
+// placements are point-symmetric about the centre so neither team has the better side
+function mirrorRec(rec) { const fp = footprint(rec.t, rec.r); return Object.assign({}, rec, { x: GX - rec.x - fp[0], z: GZ - rec.z - fp[1], r: (rec.r + 2) & 3, c: rec.c === TEAM_COLORS[0] ? TEAM_COLORS[1] : rec.c === TEAM_COLORS[1] ? TEAM_COLORS[0] : rec.c, team: rec.team === 0 ? 1 : rec.team === 1 ? 0 : rec.team }); }
+function mirrorPiece(p) { return [p[0], GX - p[1] - p[4], p[2], GZ - p[3] - p[6], p[4], p[5], p[6], p[7] || 0]; }
+function mapBuilder(seed) {
+  const r = rng(seed), b = [], rects = [];
+  const free = (x, z, w, d, m = 2) => { if (x < 6 || z < 6 || x + w > GX - 6 || z + d > GZ - 6) return false; for (const q of rects) if (x < q[0] + q[2] + m && x + w + m > q[0] && z < q[1] + q[3] + m && z + d + m > q[1]) return false; return true; };
+  const put = (rec, m = 2, mirror = true) => {
+    rec.x = Math.round(rec.x / 2) * 2; rec.z = Math.round(rec.z / 2) * 2; const fp = footprint(rec.t, rec.r);
+    const mr = mirrorRec(rec), mfp = footprint(mr.t, mr.r);
+    if (!free(rec.x, rec.z, fp[0], fp[1], m)) return false;
+    if (mirror) { if (mr.x < rec.x + fp[0] + m && mr.x + mfp[0] + m > rec.x && mr.z < rec.z + fp[1] + m && mr.z + mfp[1] + m > rec.z) return false; if (!free(mr.x, mr.z, mfp[0], mfp[1], m)) return false; }
+    b.push(rec); rects.push([rec.x, rec.z, fp[0], fp[1]]); if (mirror) { b.push(mr); rects.push([mr.x, mr.z, mfp[0], mfp[1]]); }
+    return true;
+  };
+  return { r, b, rects, put, free };
+}
+const C0 = GX >> 1;
+// Town Siege: a whole market town packed onto the plot, one shrine at each end, streets crossing in the middle
+export function genTown(seed) {
+  const M_ = mapBuilder(seed), { r, put } = M_;
+  put({ t: 'shrine', x: C0 - 8, z: C0 + 88, r: 0, l: 1, c: TEAM_COLORS[0], team: 0 }, 0);
+  // keep the main street and the cross street open
+  M_.rects.push([C0 - 12, 12, 24, 232], [12, C0 - 10, 232, 20]);
+  const kinds = ['tudor', 'stonehouse', 'house', 'house', 'cabin', 'stonehouse', 'forge', 'barracks', 'mill', 'market', 'tower', 'well', 'crates', 'hay', 'sandbags', 'sandbags', 'wall', 'spikes', 'garden', 'powder'];
+  for (let i = 0; i < 26; i++) {
+    const t = kinds[i % kinds.length];
+    for (let k = 0; k < 40; k++) { const x = r.range(14, GX - 30), z = r.range(C0 + 14, GZ - 34), rot = r.int(0, 3); if (put({ t, x, z, r: rot, l: 1 }, t === 'sandbags' || t === 'crates' || t === 'hay' ? 1 : 2)) break; }
+  }
+  put({ t: 'bastion', x: C0 - 46, z: C0 + 58, r: 0, l: 1 }, 1); put({ t: 'well', x: C0 + 14, z: C0 + 14, r: 0, l: 1 }, 0);
+  put({ t: 'lamp', x: C0 - 14, z: C0 + 40, r: 0, l: 1 }, 0); put({ t: 'lamp', x: C0 + 12, z: C0 + 70, r: 0, l: 1 }, 0);
+  return { b: M_.b.filter((q) => q.t !== undefined), f: [], lvl: 8, seed };
+}
+// Build & Battle: two empty halves with a shrine each and a little cover in no man's land
+export const DUEL_SPLIT = 14;          // cells either side of the centre line nobody may build on
+export function genDuel(seed) {
+  const M_ = mapBuilder(seed), { r, put } = M_;
+  put({ t: 'shrine', x: C0 - 8, z: C0 + 92, r: 0, l: 1, c: TEAM_COLORS[0], team: 0 }, 0);
+  for (let i = 0; i < 4; i++) for (let k = 0; k < 30; k++) { const t = r.pick(['sandbags', 'hay', 'crates', 'spikes']); if (put({ t, x: r.range(20, GX - 40), z: r.range(C0 + 2, C0 + 10), r: r.int(0, 1), l: 1 }, 2)) break; }
+  return { b: M_.b, f: [], lvl: 6, seed };
+}
+// what an AI commander builds in its minute, relative to its shrine (team 0 side = +z); mirrored for the other side
+export function duelBotPlan(seed) {
+  const r = rng(seed), plan = [], cx = C0, sz = C0 + 92;
+  const pick2 = (a) => a[Math.floor(r() * a.length)];
+  const style = r.int(0, 2);
+  const wall = style === 0 ? 'wall' : style === 1 ? 'palisade' : 'sandbags', seg = wall === 'sandbags' ? 12 : 16;
+  for (let x = cx - 40; x < cx + 40; x += seg) if (Math.abs(x + seg / 2 - cx) > 6) plan.push({ b: { t: wall, x, z: sz - 26, r: 0, l: 1 } });
+  plan.push({ b: { t: 'gate', x: cx - 8, z: sz - 30, r: 0, l: 1 } });
+  plan.push({ b: { t: 'tower', x: cx - 52, z: sz - 14, r: 0, l: 1 } }, { b: { t: 'tower', x: cx + 40, z: sz - 14, r: 0, l: 1 } });
+  plan.push({ b: { t: 'turret', x: cx - 22, z: sz - 12, r: 0, l: 1 } }, { b: { t: 'turret', x: cx + 16, z: sz - 12, r: 0, l: 1 } });
+  for (let i = 0; i < 5; i++) plan.push({ b: { t: 'mine', x: cx + r.range(-44, 44), z: sz - r.range(34, 60), r: 0, l: 1 } });
+  for (let i = 0; i < 4; i++) plan.push({ b: { t: pick2(['sandbags', 'spikes', 'crates', 'hay']), x: cx + r.range(-48, 40), z: sz - r.range(36, 64), r: r.int(0, 1), l: 1 } });
+  if (style === 0) plan.push({ b: { t: 'bastion', x: cx + 26, z: sz - 6, r: 0, l: 1 } });
+  else plan.push({ b: { t: 'bunker', x: cx - 50, z: sz + 4, r: 0, l: 1 } });
+  return plan;
+}
+export { mirrorRec, mirrorPiece };
+
+// the survivors' camp a new player starts with; the story adds a building every day
 export function starterVillage() {
   const C = GX >> 1;
   return { b: [
     { t: 'hall', x: C - 20, z: C - 20, r: 0, l: 1 },
-    { t: 'cabin', x: C - 58, z: C - 8, r: 3, l: 1 }, { t: 'house', x: C + 30, z: C - 12, r: 1, l: 1 },
-    { t: 'mill', x: C - 54, z: C + 30, r: 0, l: 1 }, { t: 'quarry', x: C + 30, z: C + 30, r: 0, l: 1 },
-    { t: 'tower', x: C + 14, z: C + 40, r: 0, l: 1 }, { t: 'market', x: C - 24, z: C + 34, r: 0, l: 1 },
+    { t: 'cabin', x: C - 58, z: C - 8, r: 3, l: 1 }, { t: 'cabin', x: C + 34, z: C - 10, r: 1, l: 1 },
+    { t: 'mill', x: C - 54, z: C + 30, r: 0, l: 1 }, { t: 'well', x: C + 4, z: C + 28, r: 0, l: 1 },
     { t: 'lamp', x: C - 8, z: C + 26, r: 0, l: 1 }, { t: 'lamp', x: C + 8, z: C + 26, r: 0, l: 1 },
-    { t: 'well', x: C + 4, z: C + 28, r: 0, l: 1 }, { t: 'hay', x: C - 44, z: C + 18, r: 0, l: 1 }, { t: 'crates', x: C + 22, z: C + 16, r: 0, l: 1 },
-    { t: 'palisade', x: C - 40, z: C + 66, r: 0, l: 1 }, { t: 'palisade', x: C - 24, z: C + 66, r: 0, l: 1 }, { t: 'palisade', x: C + 10, z: C + 66, r: 0, l: 1 }, { t: 'palisade', x: C + 26, z: C + 66, r: 0, l: 1 },
-    { t: 'vault', x: C - 28, z: C - 50, r: 0, l: 1 }, { t: 'banner', x: C - 12, z: C + 22, r: 0, l: 1 },
+    { t: 'hay', x: C - 44, z: C + 18, r: 0, l: 1 }, { t: 'crates', x: C + 22, z: C + 16, r: 0, l: 1 }, { t: 'banner', x: C - 12, z: C + 22, r: 0, l: 1 },
+    { t: 'vault', x: C - 28, z: C - 50, r: 0, l: 1 },
   ], f: [], lvl: 1 };
 }
 

@@ -18,6 +18,14 @@ export const BRICKS = [
 export const CATS = [
   { key: 'homes', name: 'Homes' }, { key: 'economy', name: 'Economy' }, { key: 'defence', name: 'Defence' }, { key: 'decor', name: 'Decor' }, { key: 'bricks', name: 'Bricks' },
 ];
+// build session backed by the player's own village and resources
+export function profileCtx() {
+  return {
+    match: false, village: () => G.profile.village, color: () => G.game.color(), afford: (c) => G.game.canAfford(G.game.buildCost(c)), spend: (c) => G.game.spend(G.game.buildCost(c)), refund: (c) => G.game.addRes(c),
+    count: (t) => G.game.count(t), limit: (bp) => bp.max[G.game.hallLevel() - 1], hall: () => G.game.hallLevel(), save: (now) => G.game.save(now), track: (k) => G.game.track(k, 1),
+    bounds: [6, 6, GX - 6, GZ - 6], freeLimit: () => 1200 + G.game.hallLevel() * 800,
+  };
+}
 export function brickCost(b) { if (b.cost) return b.cost; const m = MATS[b.mat], n = Math.max(1, Math.ceil(b.s[0] * b.s[1] * b.s[2] * m.cpc)); return { [m.res]: n }; }
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4();
@@ -26,7 +34,7 @@ export class BuildMode {
   constructor() {
     this.active = false; this.cat = 0; this.sel = 0; this.rot = 0; this.walk = false;
     this.pos = new THREE.Vector3(0, 9, 34); this.yaw = 0; this.pitch = -0.35; this.vel = new THREE.Vector3();
-    this.infos = new Map(); this.nextBid = 2; this.undo = []; this.target = null; this.valid = false; this.reason = ''; this.lastPaint = ''; this.splatT = -1;
+    this.infos = new Map(); this.nextBid = 2; this.ctx = profileCtx(); this.undo = []; this.target = null; this.valid = false; this.reason = ''; this.lastPaint = ''; this.splatT = -1;
     const gm = new THREE.MeshBasicMaterial({ color: 0x55ff77, transparent: true, opacity: 0.4, depthWrite: false });
     this.ghostMat = gm;
     this.ghost = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), gm, 6000); this.ghost.frustumCulled = false; this.ghost.count = 0; this.ghost.visible = false; this.ghost.renderOrder = 30;
@@ -37,34 +45,41 @@ export class BuildMode {
     const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     this.grid = new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.13, depthWrite: false })); this.grid.visible = false;
   }
-  items() { const c = CATS[this.cat].key; if (c === 'bricks') return BRICKS.map((b, i) => ({ brick: b, i, name: b.name })); return Object.values(BP).filter((b) => b.cat === c).map((b) => ({ bp: b, name: b.name })); }
+  cats() { return this.ctx.cats ? CATS.filter((c) => this.ctx.cats.includes(c.key)) : CATS; }
+  items() { const c = this.cats()[clamp(this.cat, 0, this.cats().length - 1)].key; if (c === 'bricks') return BRICKS.map((b, i) => ({ brick: b, i, name: b.name })); return Object.values(BP).filter((b) => b.cat === c && (!this.ctx.allow || this.ctx.allow(b.key))).map((b) => ({ bp: b, name: b.name })); }
+  inBounds(x, z, sx, sz) { const b = this.ctx.bounds; return x >= b[0] && z >= b[1] && x + sx <= b[2] && z + sz <= b[3]; }
   item() { const it = this.items(); return it[clamp(this.sel, 0, it.length - 1)]; }
 
-  enter() {
-    const w = G.world, v = G.profile.village;
+  // ctx: where the plot, money and limits come from (the player's village, or a Build & Battle match)
+  enter(ctx = profileCtx()) {
+    const w = G.world; this.ctx = ctx; this.cat = 0; this.sel = 0; this.ghostKey = '';
     this.active = true; this.walk = false; this.undo = [];
-    G.actors.clear(); G.fx.clear(); w.quiet = true; w.clear(); this.infos.clear(); this.nextBid = 2;
-    for (const rec of v.b) { const info = stamp(w, rec, this.nextBid++, { tint: G.game.color() }); if (info) this.infos.set(info.bid, info); }
-    for (const p of (v.f || [])) w.addPiece(p[0], p[1], p[2], p[3], p[4], p[5], p[6], 1, F_FREE | (p[7] || 0));
-    w.quiet = false; this.refreshWorld(true);
-    if (G.r3.envName !== 'noon') G.r3.setEnv('noon');
-    G.r3.scene.add(this.ghost, this.outline, this.grid); this.grid.visible = true;
-    this.pos.set(0, 11, 36); this.yaw = 0; this.pitch = -0.4;
+    if (ctx.match) { this.infos = ctx.infos; this.nextBid = ctx.nextBid(); }
+    else {
+      const v = ctx.village();
+      G.actors.clear(); G.fx.clear(); w.quiet = true; w.clear(); this.infos.clear(); this.nextBid = 2;
+      for (const rec of v.b) { const info = stamp(w, rec, this.nextBid++, { tint: ctx.color() }); if (info) this.infos.set(info.bid, info); }
+      for (const p of (v.f || [])) w.addPiece(p[0], p[1], p[2], p[3], p[4], p[5], p[6], 1, F_FREE | (p[7] || 0));
+      w.quiet = false; this.refreshWorld(true);
+      if (G.r3.envName !== 'noon') G.r3.setEnv('noon');
+    }
+    G.r3.scene.add(this.ghost, this.outline, this.grid); this.grid.visible = !ctx.match;
+    const cs = ctx.camStart || [0, 11, 36, 0, -0.4]; this.pos.set(cs[0], cs[1], cs[2]); this.yaw = cs[3]; this.pitch = cs[4];
     G.r3.camera.fov = 70; G.r3.camera.updateProjectionMatrix();
-    if (G.audio) { G.audio.setMusic('build'); G.audio.setAmbience('day'); }
+    if (G.audio && !ctx.match) { G.audio.setMusic('build'); G.audio.setAmbience('day'); }
     if (G.weapons) G.weapons.holder.visible = false;
   }
-  exit() { this.active = false; G.r3.scene.remove(this.ghost, this.outline, this.grid); this.ghost.visible = false; this.outline.visible = false; G.game.save(true); }
+  exit() { this.active = false; G.r3.scene.remove(this.ghost, this.outline, this.grid); this.ghost.visible = false; this.outline.visible = false; if (this.ctx) this.ctx.save(true); }
   refreshWorld(now) {
     if (!now) { this.splatT = 0.4; return; }
     const infos = [...this.infos.values()];
     G.terrain.updateSplat(G.world, villagePaths(infos));
     const lamps = []; for (const i of infos) for (const l of i.lamps) lamps.push(l);
-    for (const p of (G.profile.village.f || [])) if (p[0] === M.EMBER) lamps.push({ x: (p[1] + 0.5) * CELL - HALF, y: (p[2] + 0.5) * CELL, z: (p[3] + 0.5) * CELL - HALF, intensity: 40, color: 0xff9a4a });
+    for (const p of (this.ctx.village().f || [])) if (p[0] === M.EMBER) lamps.push({ x: (p[1] + 0.5) * CELL - HALF, y: (p[2] + 0.5) * CELL, z: (p[3] + 0.5) * CELL - HALF, intensity: 40, color: 0xff9a4a });
     G.r3.lampSources = lamps;
   }
   rects(skipBid = -1) { const out = []; for (const i of this.infos.values()) { if (i.bid === skipBid) continue; const fp = footprint(i.rec.t, i.rec.r); out.push([i.rec.x, i.rec.z, fp[0], fp[1]]); } return out; }
-  freeLimit() { return 1200 + G.game.hallLevel() * 800; }
+  freeLimit() { return this.ctx.freeLimit(); }
 
   // ---------------------------------------------------------------- targeting
   aim() {
@@ -91,23 +106,23 @@ export class BuildMode {
       y = Math.max(0, y);
       this.target = { brick: b, x, y, z, d };
       const cost = brickCost(b);
-      if (x < 6 || z < 6 || x + d.sx > GX - 6 || z + d.sz > GZ - 6 || y + d.sy > GY - 2) this.reason = 'Outside the plot';
+      if (!this.inBounds(x, z, d.sx, d.sz) || y + d.sy > GY - 2) this.reason = this.ctx.match ? 'Build on your own side' : 'Outside the plot';
       else if (!w.canPlace(x, y, z, d.sx, d.sy, d.sz)) this.reason = 'Blocked';
       else if (!this.supported(x, y, z, d.sx, d.sy, d.sz)) this.reason = 'Needs support';
-      else if ((G.profile.village.f || []).length >= this.freeLimit()) this.reason = 'Brick limit reached — upgrade the Ember Hall';
-      else if (!G.game.canAfford(cost)) this.reason = 'Not enough resources';
+      else if ((this.ctx.village().f || []).length >= this.freeLimit()) this.reason = 'Brick limit reached';
+      else if (!this.ctx.afford(cost)) this.reason = this.ctx.match ? 'Not enough build points' : 'Not enough resources';
       else this.valid = true;
       this.target.cost = cost;
     } else {
       const bp = it.bp, fp = footprint(bp.key, this.rot);
       const x = Math.round((a.x + HALF) / CELL / 2 - fp[0] / 4) * 2, z = Math.round((a.z + HALF) / CELL / 2 - fp[1] / 4) * 2;
-      const cost = bpCost(bp.key, 1), lim = bp.max[G.game.hallLevel() - 1], have = G.game.count(bp.key);
+      const cost = bpCost(bp.key, 1), lim = this.ctx.limit(bp), have = this.ctx.count(bp.key);
       this.target = { bp, x, z, fp, cost, lim, have };
-      if (x < 6 || z < 6 || x + fp[0] > GX - 6 || z + fp[1] > GZ - 6) this.reason = 'Outside the plot';
-      else if (have >= lim) this.reason = lim === 0 ? 'Requires a higher Ember Hall level' : 'Limit reached (' + lim + ') — upgrade the Ember Hall';
+      if (!this.inBounds(x, z, fp[0], fp[1])) this.reason = this.ctx.match ? 'Build on your own side' : 'Outside the plot';
+      else if (have >= lim) this.reason = this.ctx.match ? 'Limit reached' : lim === 0 ? 'Needs a bigger Ember Hall' : 'Limit reached — upgrade the Hall';
       else if (this.rects().some((q) => x < q[0] + q[2] && x + fp[0] > q[0] && z < q[1] + q[3] && z + fp[1] > q[1])) this.reason = 'Overlaps another building';
       else if (!w.boxFree(x * CELL - HALF + 0.01, 0.01, z * CELL - HALF + 0.01, (x + fp[0]) * CELL - HALF - 0.01, 4, (z + fp[1]) * CELL - HALF - 0.01)) this.reason = 'Blocked by bricks';
-      else if (!G.game.canAfford(cost)) this.reason = 'Not enough resources';
+      else if (!this.ctx.afford(cost)) this.reason = this.ctx.match ? 'Not enough build points' : 'Not enough resources';
       else this.valid = true;
     }
   }
@@ -144,35 +159,35 @@ export class BuildMode {
 
   // ---------------------------------------------------------------- actions
   place() {
-    const t = this.target, w = G.world, v = G.profile.village;
+    const t = this.target, w = G.world, v = this.ctx.village();
     if (!t) return;
     if (!this.valid) { if (G.hud) G.hud.toast(this.reason, 1.4, 'build'); if (G.audio && !t.brick) G.audio.ui('deny'); return; }
     if (t.brick) {
       const fl = (t.d.tilt || 0) | (t.brick.flags || 0);
       const id = w.addPiece(t.brick.mat, t.x, t.y, t.z, t.d.sx, t.d.sy, t.d.sz, 1, F_FREE | fl); if (id < 0) return;
-      G.game.spend(t.cost); const rec = [t.brick.mat, t.x, t.y, t.z, t.d.sx, t.d.sy, t.d.sz, fl]; v.f.push(rec);
-      this.undo.push({ type: 'brick', rec, cost: t.cost });
+      this.ctx.spend(t.cost); const rec = [t.brick.mat, t.x, t.y, t.z, t.d.sx, t.d.sy, t.d.sz, fl]; v.f.push(rec);
+      this.undo.push({ type: 'brick', rec, cost: t.cost }); if (this.ctx.onPlace) this.ctx.onPlace({ f: rec });
       if (t.brick.mat === M.EMBER) this.refreshWorld(true);
     } else {
-      const rec = { t: t.bp.key, x: t.x, z: t.z, r: this.rot, l: 1 }; G.game.spend(t.cost);
-      const info = stamp(w, rec, this.nextBid++, { tint: G.game.color() }); v.b.push(rec); this.infos.set(info.bid, info);
-      this.undo.push({ type: 'building', bid: info.bid, cost: t.cost }); this.refreshWorld();
+      const rec = { t: t.bp.key, x: t.x, z: t.z, r: this.rot, l: 1 }; this.ctx.spend(t.cost);
+      const info = stamp(w, rec, this.nextBid++, { tint: this.ctx.color() }); v.b.push(rec); this.infos.set(info.bid, info);
+      this.undo.push({ type: 'building', bid: info.bid, cost: t.cost }); this.refreshWorld(); if (this.ctx.onPlace) this.ctx.onPlace({ b: rec });
       G.fx.dust(info.cx, 0.3, info.cz, 8, info.radius);
     }
     if (this.undo.length > 60) this.undo.shift();
-    G.game.track('built', 1); G.game.save(); if (G.audio) G.audio.ui('place');
+    this.ctx.track('built'); this.ctx.save(); if (G.audio) G.audio.ui('place');
     this.ghostKey = this.ghostKey;
   }
   removeBuilding(bid, refund) {
-    const info = this.infos.get(bid), w = G.world, v = G.profile.village; if (!info) return false;
+    const info = this.infos.get(bid), w = G.world, v = this.ctx.village(); if (!info) return false;
     for (let i = 0; i < w.phwm; i++) if (w.palive[i] && w.pbid[i] === bid) w.removePiece(i, 'silent');
     const k = v.b.indexOf(info.rec); if (k >= 0) v.b.splice(k, 1);
     this.infos.delete(bid);
-    const c = bpCost(info.rec.t, info.rec.l || 1), back = {}; for (const r in c) back[r] = Math.floor(c[r] * refund); G.game.addRes(back);
+    const c = bpCost(info.rec.t, info.rec.l || 1), back = {}; for (const r in c) back[r] = Math.floor(c[r] * refund); this.ctx.refund(back);
     this.refreshWorld(); return true;
   }
   removeAt() {
-    const id = this.hover, w = G.world, v = G.profile.village; if (id < 0 || !w.palive[id]) return;
+    const id = this.hover, w = G.world, v = this.ctx.village(); if (id < 0 || !w.palive[id]) return;
     const bid = w.pbid[id];
     if (bid >= 2) {
       const info = this.infos.get(bid); if (!info) return;
@@ -182,15 +197,15 @@ export class BuildMode {
       const x = w.px[id], y = w.py[id], z = w.pz[id], k = v.f.findIndex((p) => p[1] === x && p[2] === y && p[3] === z);
       const mat = w.pm[id], cells = w.sx[id] * w.sy[id] * w.sz[id];
       w.removePiece(id, 'silent');
-      if (k >= 0) { v.f.splice(k, 1); const m = MATS[mat]; if (mat === M.EMBER) { G.game.addRes({ gold: 150, iron: 20 }); this.refreshWorld(true); } else G.game.addRes({ [m.res]: Math.max(1, Math.ceil(cells * m.cpc)) }); }
+      if (k >= 0) { v.f.splice(k, 1); const m = MATS[mat]; if (mat === M.EMBER) { this.ctx.refund({ gold: 150, iron: 20 }); this.refreshWorld(true); } else this.ctx.refund({ [m.res]: Math.max(1, Math.ceil(cells * m.cpc)) }); }
       // anything that was resting on it comes down too (and is refunded)
       this.dropUnsupported();
     }
-    G.game.save(); if (G.audio) G.audio.ui('remove');
+    this.ctx.save(); if (G.audio) G.audio.ui('remove');
   }
   // free bricks left floating after a removal are removed and refunded
   dropUnsupported() {
-    const w = G.world, v = G.profile.village; w.checkIntegrityDry = true;
+    const w = G.world, v = this.ctx.village(); w.checkIntegrityDry = true;
     const n = w.phwm, visit = w.visit, stack = w.stack; visit.fill(0, 0, n); let sp = 0;
     for (let i = 0; i < n; i++) if (w.palive[i] && w.py[i] === 0) { visit[i] = 1; stack[sp++] = i; }
     const push = (id) => { if (id >= 0 && !visit[id]) { visit[id] = 1; stack[sp++] = id; } };
@@ -201,40 +216,40 @@ export class BuildMode {
     let dropped = 0;
     for (let i = 0; i < n; i++) if (w.palive[i] && !visit[i] && w.pbid[i] === 1) {
       const x = w.px[i], y = w.py[i], z = w.pz[i], k = v.f.findIndex((p) => p[1] === x && p[2] === y && p[3] === z), m = MATS[w.pm[i]], cells = w.sx[i] * w.sy[i] * w.sz[i];
-      w.removePiece(i, 'silent'); if (k >= 0) { v.f.splice(k, 1); G.game.addRes({ [m.res]: Math.max(1, Math.ceil(cells * m.cpc)) }); } dropped++;
+      w.removePiece(i, 'silent'); if (k >= 0) { v.f.splice(k, 1); this.ctx.refund({ [m.res]: Math.max(1, Math.ceil(cells * m.cpc)) }); } dropped++;
     }
     if (dropped && G.hud) G.hud.toast(dropped + ' unsupported bricks returned to stock', 1.6, 'build');
   }
   undoLast() {
-    const u = this.undo.pop(), w = G.world, v = G.profile.village; if (!u) { if (G.audio) G.audio.ui('deny'); return; }
-    if (u.type === 'brick') { const id = w.pieceAt(u.rec[1], u.rec[2], u.rec[3]); if (id >= 0 && w.pbid[id] === 1) { w.removePiece(id, 'silent'); const k = v.f.indexOf(u.rec); if (k >= 0) v.f.splice(k, 1); G.game.addRes(u.cost); if (u.rec[0] === M.EMBER) this.refreshWorld(true); } }
+    const u = this.undo.pop(), w = G.world, v = this.ctx.village(); if (!u) { if (G.audio) G.audio.ui('deny'); return; }
+    if (u.type === 'brick') { const id = w.pieceAt(u.rec[1], u.rec[2], u.rec[3]); if (id >= 0 && w.pbid[id] === 1) { w.removePiece(id, 'silent'); const k = v.f.indexOf(u.rec); if (k >= 0) v.f.splice(k, 1); this.ctx.refund(u.cost); if (u.rec[0] === M.EMBER) this.refreshWorld(true); } }
     else if (this.infos.has(u.bid)) this.removeBuilding(u.bid, 1);
-    G.game.save(); if (G.audio) G.audio.ui('back');
+    this.ctx.save(); if (G.audio) G.audio.ui('back');
   }
   upgradeHall() {
-    const lvl = G.game.hallLevel(); if (lvl >= 5) return false;
-    const cost = bpCost('hall', lvl + 1); if (!G.game.spend(cost)) { if (G.audio) G.audio.ui('deny'); return false; }
+    const lvl = this.ctx.hall(); if (lvl >= 5) return false;
+    const cost = bpCost('hall', lvl + 1); if (!this.ctx.spend(cost)) { if (G.audio) G.audio.ui('deny'); return false; }
     let hall = null; for (const i of this.infos.values()) if (i.rec.t === 'hall') hall = i;
     if (!hall) return false;
     const w = G.world; for (let i = 0; i < w.phwm; i++) if (w.palive[i] && w.pbid[i] === hall.bid) w.removePiece(i, 'silent');
     hall.rec.l = lvl + 1; this.infos.delete(hall.bid);
-    const info = stamp(w, hall.rec, this.nextBid++, { tint: G.game.color() }); this.infos.set(info.bid, info);
-    this.refreshWorld(true); G.fx.dust(info.cx, 1, info.cz, 14, 6); if (G.audio) G.audio.ui('levelup'); G.game.save(true);
+    const info = stamp(w, hall.rec, this.nextBid++, { tint: this.ctx.color() }); this.infos.set(info.bid, info);
+    this.refreshWorld(true); G.fx.dust(info.cx, 1, info.cz, 14, 6); if (G.audio) G.audio.ui('levelup'); this.ctx.save(true);
     return true;
   }
-  clearBricks() { const w = G.world, v = G.profile.village, back = {}; for (let i = 0; i < w.phwm; i++) if (w.palive[i] && w.pbid[i] === 1) { const m = MATS[w.pm[i]]; back[m.res] = (back[m.res] || 0) + Math.max(1, Math.ceil(w.sx[i] * w.sy[i] * w.sz[i] * m.cpc)); w.removePiece(i, 'silent'); } v.f.length = 0; G.game.addRes(back); this.undo = []; this.refreshWorld(true); G.game.save(true); }
+  clearBricks() { const w = G.world, v = this.ctx.village(), back = {}; for (let i = 0; i < w.phwm; i++) if (w.palive[i] && w.pbid[i] === 1) { const m = MATS[w.pm[i]]; back[m.res] = (back[m.res] || 0) + Math.max(1, Math.ceil(w.sx[i] * w.sy[i] * w.sz[i] * m.cpc)); w.removePiece(i, 'silent'); } v.f.length = 0; this.ctx.refund(back); this.undo = []; this.refreshWorld(true); this.ctx.save(true); }
 
   // ---------------------------------------------------------------- per-frame
   update(dt) {
     const inp = Input, cam = G.r3.camera, locked = inp.locked;
     if (this.splatT >= 0) { this.splatT -= dt; if (this.splatT < 0) this.refreshWorld(true); }
     if (locked) {
-      if (inp.pressed.KeyF) { this.walk = !this.walk; if (this.walk) { G.player.reset(clamp(this.pos.x, -30, 30), clamp(this.pos.z, -30, 30), this.yaw); G.player.pos.y = G.world.groundAt(G.player.pos.x, G.player.pos.z, 14); G.player.pitch = this.pitch; } else { this.pos.copy(G.player.pos); this.pos.y += 3; this.yaw = G.player.yaw; this.pitch = G.player.pitch; } if (G.hud) G.hud.toast(this.walk ? 'Walk mode' : 'Fly mode', 1, 'build'); }
-      for (let i = 0; i < CATS.length; i++) if (inp.pressed['Digit' + (i + 1)]) { this.cat = i; this.sel = 0; this.ghostKey = ''; if (G.ui) G.ui.buildRefresh(); if (G.audio) G.audio.ui('click'); }
+      if (inp.pressed.KeyF && !this.ctx.match) { this.walk = !this.walk; if (this.walk) { G.player.reset(clamp(this.pos.x, -30, 30), clamp(this.pos.z, -30, 30), this.yaw); G.player.pos.y = G.world.groundAt(G.player.pos.x, G.player.pos.z, 14); G.player.pitch = this.pitch; } else { this.pos.copy(G.player.pos); this.pos.y += 3; this.yaw = G.player.yaw; this.pitch = G.player.pitch; } if (G.hud) G.hud.toast(this.walk ? 'Walk mode' : 'Fly mode', 1, 'build'); }
+      for (let i = 0; i < this.cats().length; i++) if (inp.pressed['Digit' + (i + 1)]) { this.cat = i; this.sel = 0; this.ghostKey = ''; if (G.ui) G.ui.buildRefresh(); if (G.audio) G.audio.ui('click'); }
       if (inp.wheel) { const n = this.items().length; this.sel = (this.sel + (inp.wheel > 0 ? 1 : n - 1)) % n; this.ghostKey = ''; if (G.ui) G.ui.buildRefresh(); if (G.audio) G.audio.ui('hover'); }
       if (inp.pressed.KeyR) { this.rot = (this.rot + 1) & 3; if (G.audio) G.audio.ui('hover'); }
       if (inp.pressed.KeyZ) this.undoLast();
-      if (inp.bPressed[1] && this.hover >= 0 && G.world.pbid[this.hover] === 1) { const w = G.world, id = this.hover, k = BRICKS.findIndex((b) => b.mat === w.pm[id]); if (k >= 0) { this.cat = CATS.length - 1; this.sel = k; if (G.ui) G.ui.buildRefresh(); } }
+      if (inp.bPressed[1] && this.hover >= 0 && G.world.pbid[this.hover] === 1) { const w = G.world, id = this.hover, k = BRICKS.findIndex((b) => b.mat === w.pm[id]); if (k >= 0) { this.cat = this.cats().findIndex((c) => c.key === 'bricks'); this.sel = k; if (G.ui) G.ui.buildRefresh(); } }
     }
     if (this.walk) { G.player.update(dt, locked); G.player.applyCamera(cam, 70); }
     else {
@@ -245,7 +260,7 @@ export class BuildMode {
       const tx = (ix * c + iz * s * cp) * sp, tz = (-ix * s + iz * c * cp) * sp, ty = (iy - iz * Math.sin(this.pitch) * -1 * 0 + (iz < 0 ? Math.sin(this.pitch) : iz > 0 ? -Math.sin(this.pitch) : 0)) * sp;
       this.vel.x = damp(this.vel.x, tx, 10, dt); this.vel.y = damp(this.vel.y, ty, 10, dt); this.vel.z = damp(this.vel.z, tz, 10, dt);
       this.pos.addScaledVector(this.vel, dt);
-      this.pos.x = clamp(this.pos.x, -48, 48); this.pos.z = clamp(this.pos.z, -48, 48); this.pos.y = clamp(this.pos.y, 0.5, 38);
+      const lim = this.ctx.camBounds || [-48, -48, 48, 48]; this.pos.x = clamp(this.pos.x, lim[0], lim[2]); this.pos.z = clamp(this.pos.z, lim[1], lim[3]); this.pos.y = clamp(this.pos.y, 0.5, 38);
       cam.position.copy(this.pos); cam.rotation.set(this.pitch, this.yaw, 0);
     }
     cam.updateMatrixWorld();

@@ -77,7 +77,7 @@ export class Combat {
   fireBullet(o) {
     const sp = o.speed || 500;
     const b = { x: o.origin.x, y: o.origin.y, z: o.origin.z, vx: o.dir.x * sp, vy: o.dir.y * sp, vz: o.dir.z * sp, dmg: o.dmg, brick: o.brick || 1, left: o.range, travelled: 0, pen: 0,
-      shooter: o.shooter, team: o.team, falloff: o.falloff, head: o.head || 2, impulse: o.impulse || 3, shot: o.shot || 0, tracer: o.tracer !== false && o.tracer !== null, color: o.color || [1, 0.85, 0.5],
+      shooter: o.shooter, team: o.team, falloff: o.falloff, head: o.head || 2, impulse: o.impulse || 3, shot: o.shot || 0, tracer: o.tracer !== false && o.tracer !== null, color: o.color || [1, 0.85, 0.5], foreign: !!o.foreign,
       ox: o.vis ? o.vis.x - o.origin.x : 0, oy: o.vis ? o.vis.y - o.origin.y : 0, oz: o.vis ? o.vis.z - o.origin.z : 0, dead: false, whiz: false, cos: !!o.cos, sx: o.origin.x, sy: o.origin.y, sz: o.origin.z };
     this.bullets.push(b);
     this.stepBullet(b, 1 / 120);          // point-blank shots land on the frame they are fired
@@ -102,13 +102,14 @@ export class Combat {
       if (r.kind === 'none') { rem = 0; break; }
       b.travelled += t;
       if (b.cos) { b.dead = true; fx.sparks(px, py, pz, 2, 3); break; }
+      if ((r.kind === 'actor' || r.kind === 'player') && b.foreign) { fx.impact(px, py, pz, -dx, -dy, -dz, 'flesh'); b.dead = true; break; }
       if (r.kind === 'actor' || r.kind === 'player') {
         let d = b.dmg;
         if (b.falloff) d *= lerp(1, b.falloff[2], clamp((b.travelled - b.falloff[0]) / (b.falloff[1] - b.falloff[0]), 0, 1));
         const head = r.part === 2; if (head) d *= b.head; else if (r.part === 0) d *= 0.75;
         fx.impact(px, py, pz, -dx, -dy, -dz, 'flesh'); if (au) au.impact('flesh', px, py, pz);
         _d.set(dx, dy, dz);
-        if (r.kind === 'player') { _p.set(b.sx, b.sy, b.sz); G.player.damage(d, _p, 'bullet'); }
+        if (r.kind === 'player') { _p.set(b.sx, b.sy, b.sz); G.player.lastBy = b.shooter && b.shooter.netId; G.player.damage(d, _p, head ? 'head' : 'bullet'); }
         else { const killed = r.actor.damage(d, b.shooter, head ? 'head' : 'bullet', _d, { part: r.part, power: b.impulse }); if (b.shooter === G.player && G.weapons) G.weapons.onBulletHit(b, head, killed); }
         b.dead = true; break;
       }
@@ -147,7 +148,8 @@ export class Combat {
     else if (b.team > 0 && G.player && !G.player.dead && !b.whiz) { const p = G.player.eyePos, d2 = distSeg(p.x, p.y, p.z, s0x, s0y, s0z, dx, dy, dz, segLen); if (d2 < 2.0) { b.whiz = true; G.player.suppress = Math.min(1, G.player.suppress + 0.22); if (au) au.whiz(); } }
   }
 
-  explosion(x, y, z, radius, dmg, owner, team = -1) {
+  // spare: scripted set-piece blasts leave villagers and named companions alone
+  explosion(x, y, z, radius, dmg, owner, team = -1, spare = false) {
     const w = G.world;
     w.explode(x, y, z, radius, dmg);
     G.terrain.explodeTrees(x, z, radius, dmg);
@@ -159,11 +161,11 @@ export class Combat {
       const cover = w.los(x, y + 0.2, z, cx, cy, cz) || w.los(x, y + 0.6, z, cx, pos.y + h * 0.9, cz) ? 1 : 0.25;
       const amount = dmg * 0.75 * Math.pow(1 - d / R, 1.3) * cover;
       if (amount < 1) return;
-      if (isPlayer) target.damage(amount * (owner === target ? 0.6 : 0.8), { x, y, z }, 'explosion');
+      if (isPlayer) { target.lastBy = owner && (owner.netId || (owner === G.player ? 'self' : null)); } if (isPlayer) target.damage(amount * (owner === target ? 0.6 : 0.8), { x, y, z }, 'explosion');
       else { _d.set(cx - x, 0.35, cz - z).normalize(); const killed = target.damage(amount, owner, 'explosion', _d, { part: 1, power: 5 + 9 * (1 - d / R), stagger: 1 }); if (killed && owner === G.player && G.mode) G.mode.onExplosiveKill(target); }
     };
     const friendly = owner === G.player || (owner && owner.team === 0);
-    if (G.actors) for (const a of G.actors.list.slice()) { if (!a.dead && !(team >= 0 && a.team === team) && !(friendly && a.team === 0)) hurt(a.pos, a.height, a, false); }
+    if (G.actors) for (const a of G.actors.list.slice()) { if (!a.dead && !a.puppet && !(spare && (a.T.civilian || a.named)) && !(team >= 0 && a.team === team) && !(friendly && a.team === 0)) hurt(a.pos, a.height, a, false); }
     const p = G.player;
     if (p && !p.dead && team !== 0) hurt(p.pos, p.height, p, true); else if (p && !p.dead && owner === p) hurt(p.pos, p.height, p, true);
     if (p) { const d = Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z); p.shake = Math.min(1.6, p.shake + clamp(radius * 3.5 / (d + 2), 0, 1.4)); if (d < radius * 2) G.r3.fx.flash = Math.max(G.r3.fx.flash, 0.5 * (1 - d / (radius * 2))); }

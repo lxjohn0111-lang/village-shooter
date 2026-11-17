@@ -180,6 +180,8 @@ export class FX {
     this.fires.push({ x, y: Math.max(y, terrainH(x, z)) + 0.1, z, t: rand(2.5, 5), acc: 0 });
   }
 
+  // pulsing red glow where a shell is about to land
+  warn(x, y, z, dur) { for (let i = 0; i < 6; i++) this.fireP.add(x, y + 0.08, z, 0, 0, 0, dur * (0.4 + i * 0.12), 2.8, 0.6, 1, 0.12, 0.05, 0.55, 0, 0, 0, 1); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; this.fireP.add(x + Math.cos(a) * 2.2, y + 0.1, z + Math.sin(a) * 2.2, 0, 0.2, 0, dur, 0.5, 0.2, 1, 0.15, 0.05, 0.8, 0, 0, 0, 1); } }
   muzzleSmoke(x, y, z, dx, dy, dz) {
     const L = this.light * 0.6 + 0.15;
     this.smoke.add(x, y, z, dx * 2 + rand(-0.3, 0.3), dy * 2 + 0.3, dz * 2 + rand(-0.3, 0.3), rand(0.4, 0.8), 0.12, 0.7, 0.6 * L, 0.6 * L, 0.6 * L, 0.18, 1, -0.3, 3);

@@ -1,9 +1,10 @@
 // Mission engine shared by raids, village defence and story missions.
 import * as THREE from 'three';
-import { G, CELL, HALF, clamp, rand, randi, pick, terrainH, rng } from './util.js';
+import { G, CELL, HALF, clamp, rand, randi, pick, terrainH, rng, TAU } from './util.js';
 import { M, F_LOOT, F_CORE } from './materials.js';
 import { buildVillage } from './blueprints.js';
 import { LOOKS, clanLook, ETYPES } from './actors.js';
+import { CAST } from './story.js';
 
 const COUNTABLE = new Set(['hall', 'house', 'cabin', 'stonehouse', 'tudor', 'mill', 'quarry', 'forge', 'market', 'vault', 'barracks', 'tower', 'bastion', 'turret', 'gate', 'bunker', 'ashen', 'depot', 'tent', 'well', 'cage']);
 const _v = new THREE.Vector3();
@@ -29,6 +30,7 @@ export class Mission {
     this.dialogQ = []; this.dialogT = 0; this.fired = new Set(); this.revived = false; this.alarm = false; this.streak = 0; this.streakT = 0;
     this.timeLimit = cfg.timeLimit || 0; this.endHold = 0; this.boss = null; this.musicT = 0; this.heat = 0;
     this.spawn = cfg.spawn || { x: 0, z: 47, yaw: 0 };
+    this.named = new Map(); this.civs = []; this.warnings = []; this.evFired = new Set(); this.evEvery = []; this.huntT = 0;
   }
 
   start() {
@@ -76,7 +78,9 @@ export class Mission {
     } else {
       for (let i = 0; i < 4; i++) { const p = freeSpot(rand(-14, 14), 0, rand(8, 22)); G.actors.spawn('guard', 0, p.x, p.y, p.z, { look: LOOKS.ally, yaw: rand(6.28) }); }
     }
+    if (this.kind !== 'menu') this.spawnCast();
     const pl = G.player; pl.reset(this.spawn.x, this.spawn.z, this.spawn.yaw); pl.stats.dmgTaken = 0;
+    if (G.profile && G.profile.bonds && (G.profile.bonds.ilka || 0) >= 3) { pl.maxHp = 120; pl.hp = 120; } else pl.maxHp = 100;
     if (this.kind !== 'menu') G.weapons.setLoadout(cfg.primary || G.profile.primary, G.profile.weapons, { grenades: 3 });
     this.setStage(0);
     w.quiet = false; this.state = this.kind === 'menu' ? 'menu' : 'play';
@@ -84,10 +88,34 @@ export class Mission {
     if (G.audio) { G.audio.setAmbience(G.r3.env.amb); }
   }
 
+  // named companions, villagers to escort, burning houses
+  spawnCast() {
+    const cfg = this.cfg;
+    for (const n of (cfg.named || [])) {
+      const p = freeSpot(n.x, 0, n.z);
+      const a = G.actors.spawn(n.type, 0, p.x, p.y, p.z, { look: LOOKS.ally, hold: !!n.hold, hpMul: 3, yaw: Math.PI, role: n.follow ? 'escort' : 'guard' });
+      a.named = n.name; a.castKey = n.key; if (n.follow) a.follow = G.player; this.named.set(n.name, a);
+    }
+    for (const c of (cfg.civilians || [])) {
+      const p = freeSpot(c.x, 0, c.z);
+      const a = G.actors.spawn('hostage', 0, p.x, p.y, p.z, { look: LOOKS.civilian, hpMul: 2.2, yaw: Math.PI });
+      a.freed = true; a.follow = G.player; if (c.name) a.named = c.name; this.civs.push(a);
+    }
+    if (cfg.burning) {
+      const r = rng(77), list = this.buildings.filter((b) => b.info.type !== 'hall');
+      for (let i = 0; i < cfg.burning && list.length; i++) {
+        const b = list.splice(Math.floor(r() * list.length), 1)[0], x = b.info.cx + r.range(-1.5, 1.5), z = b.info.cz + r.range(-1.5, 1.5), y = Math.max(0.2, G.world.groundAt(x, z, 8));
+        for (let k = 0; k < 3; k++) G.fx.fires.push({ x: x + r.range(-2, 2), y: y + r.range(0, 1), z: z + r.range(-2, 2), t: 1e9, acc: r() });
+        G.r3.lampSources.push({ x, y: y + 1.5, z, intensity: 55, color: 0xff6a20 });
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- objectives
   setStage(i) {
     this.stage = i; const defs = this.stages[i] || [];
-    this.objs = defs.map((d) => Object.assign({ done: false, prog: '' }, d));
+    const keep = (this.objs || []).filter((o) => o.keep && !o.done);
+    this.objs = defs.map((d) => Object.assign({ done: false, prog: '', left: d.sec || 0 }, d)).concat(keep);
     if (this.kind === 'raid') this.objs = [{ type: 'raidPct', text: 'Raze the village', done: false, prog: '' }, { type: 'core', text: 'Shatter the Ember Heart', done: false, prog: '' }];
     if (this.kind === 'defend') this.objs = [{ type: 'endless', text: 'Hold out as long as you can', done: false, prog: '' }, { type: 'protect', text: 'Keep the Ember Heart intact', done: false, prog: '' }];
     for (const o of this.objs) if (o.type === 'killType') o.total = G.actors.list.filter((a) => a.team === 1 && o.kinds.includes(a.type)).length;
@@ -110,13 +138,17 @@ export class Mission {
       case 'waves': o.prog = Math.min(this.wavesCleared, o.n) + '/' + o.n; o.done = this.wavesCleared >= o.n; break;
       case 'endless': o.prog = 'Wave ' + Math.max(1, this.wave); break;
       case 'protect': o.prog = Math.round(clamp((this.coreHealth() - 0.4) / 0.6, 0, 1) * 100) + '%'; o.done = false; o.passive = true; break;
-      case 'extract': { const d = Math.hypot(G.player.pos.x - this.spawn.x, G.player.pos.z - this.spawn.z); o.prog = Math.round(d) + ' m'; o.done = d < 7; break; }
+      case 'extract': { const ex = this.cfg.exit || this.spawn, d = Math.hypot(G.player.pos.x - ex.x, G.player.pos.z - ex.z); o.prog = Math.round(d) + ' m'; o.done = d < (ex.r || 7); break; }
+      case 'escort': { const esc = this.stats.escaped || 0, alive = this.escortees().filter((a) => !a.dead && !a.escaped).length; o.prog = esc + '/' + o.n; o.done = esc >= o.n; if (!o.done && esc + alive < o.n) this.fail('The villagers did not make it'); break; }
+      case 'survive': { o.left = Math.max(0, o.left - this.dtObj); o.prog = Math.ceil(o.left) + 's'; o.done = o.left <= 0; break; }
+      case 'timer': { o.passive = true; o.left = Math.max(0, o.left - this.dtObj); o.prog = Math.floor(o.left / 60) + ':' + String(Math.floor(o.left % 60)).padStart(2, '0'); if (o.left <= 0) this.fail('Out of time'); break; }
     }
     return o.done;
   }
   evalBonus(b) {
     const s = this.stats;
     switch (b.type) {
+      case 'quiet': return !this.alarm; case 'escortAll': return (s.escaped || 0) >= this.civs.length && this.civs.length > 0;
       case 'headshots': return s.headshots >= b.n; case 'time': return this.time <= b.sec; case 'coreHealth': return clamp((this.coreHealth() - 0.4) / 0.6, 0, 1) * 100 >= b.pct;
       case 'kills': return s.kills >= b.n; case 'explosiveKills': return s.explosiveKills >= b.n; case 'nodamage': return G.player.stats.dmgTaken < b.hp;
       case 'loot': return s.loot >= b.n; case 'raze': return this.razedCount(b.kinds) >= b.n;
@@ -128,8 +160,11 @@ export class Mission {
     switch (b.type) { case 'headshots': return s.headshots + '/' + b.n; case 'kills': return s.kills + '/' + b.n; case 'explosiveKills': return s.explosiveKills + '/' + b.n; case 'loot': return s.loot + '/' + b.n; case 'raze': return this.razedCount(b.kinds) + '/' + b.n; }
     return '';
   }
+  escortees() { return G.actors.list.filter((a) => a.T.civilian && a.freed && a.follow); }
   markers() {
-    const out = [], rt = this.rt;
+    const out = [], rt = this.rt, P = G.player.pos;
+    for (const w of this.warnings) out.push({ x: w.x, y: w.y + 0.6, z: w.z, label: 'INCOMING', col: '#ff3020' });
+    for (const a of G.actors.list) if (!a.dead && !a.escaped && a.team === 0 && (a.named || (a.T.civilian && a.follow)) && Math.hypot(a.pos.x - P.x, a.pos.z - P.z) < 45) out.push({ x: a.pos.x, y: a.pos.y + a.height + 0.35, z: a.pos.z, label: a.named || 'VILLAGER', col: a.named ? '#7ec8ff' : '#bfe6ff', small: true });
     for (const o of this.objs) {
       if (o.done) continue;
       if (o.type === 'core' && rt.core) out.push({ x: rt.core.x, y: rt.core.y + 1, z: rt.core.z, label: 'HEART', col: '#ff8a2a' });
@@ -137,7 +172,7 @@ export class Mission {
       else if (o.type === 'killType' || o.type === 'boss') { for (const a of G.actors.list) if (!a.dead && a.team === 1 && (o.type === 'boss' ? a.T.boss : o.kinds.includes(a.type))) out.push({ x: a.pos.x, y: a.pos.y + a.height + 0.4, z: a.pos.z, label: a.T.boss ? 'VARRO' : 'TARGET', col: '#ff3a3a' }); }
       else if (o.type === 'rescue') { for (const a of G.actors.list) if (a.T.civilian && !a.freed && !a.dead) out.push({ x: a.pos.x, y: 2.6, z: a.pos.z, label: 'FREE', col: '#5ad0ff' }); }
       else if (o.type === 'loot') { for (const b of this.buildings) if (b.info.type === 'vault' && !b.dead) out.push({ x: b.info.cx, y: 3.2, z: b.info.cz, label: 'VAULT', col: '#ffd24a' }); }
-      else if (o.type === 'extract') out.push({ x: this.spawn.x, y: terrainH(this.spawn.x, this.spawn.z) + 1.5, z: this.spawn.z, label: 'EXTRACT', col: '#6aff7a' });
+      else if (o.type === 'extract' || o.type === 'escort' || o.type === 'survive' && this.cfg.exit) { const ex = this.cfg.exit || this.spawn; out.push({ x: ex.x, y: terrainH(ex.x, ex.z) + 1.5, z: ex.z, label: o.type === 'survive' ? 'HOLD' : 'EXIT', col: '#6aff7a' }); }
       else if (o.type === 'protect' && rt.core && this.mode === 'defend') out.push({ x: rt.core.x, y: rt.core.y + 1, z: rt.core.z, label: 'DEFEND', col: '#5ad0ff' });
     }
     if (this.kind === 'raid') for (const b of this.buildings) if (b.info.type === 'vault' && !b.dead) out.push({ x: b.info.cx, y: 3.2, z: b.info.cz, label: 'VAULT', col: '#ffd24a' });
@@ -146,6 +181,11 @@ export class Mission {
 
   // ---------------------------------------------------------------- dialogue
   say(key) {
+    for (const ev of (this.cfg.events || [])) {
+      if (ev.at === key && !this.evFired.has(ev)) { this.evFired.add(ev); this.runEvent(ev); }
+      if (ev.every && ev.from === key && !this.evEvery.some((e) => e.ev === ev)) this.evEvery.push({ ev, t: 0.5 });
+      if (ev.every && ev.until === key) this.evEvery = this.evEvery.filter((e) => e.ev !== ev);
+    }
     if (this.fired.has(key)) return; this.fired.add(key);
     for (const d of (this.cfg.dialog || [])) if (d.at === key) this.dialogQ.push(d);
   }
@@ -166,7 +206,7 @@ export class Mission {
       for (const l of G.r3.lampSources) if (!l.dead && Math.hypot(l.x - b.info.cx, l.z - b.info.cz) < b.info.radius) l.dead = true;
       this.say('raze' + this.razedCount([b.info.type]));
       // cages free their prisoners
-      if (b.info.type === 'cage') for (const a of G.actors.list) if (a.T.civilian && a.cageBid === bid && !a.freed) { a.freed = true; this.stats.rescued++; this.addXp(150); if (G.hud) G.hud.feed('MASON FREED', '#5ad0ff'); if (G.audio) G.audio.ui('star'); this.say('rescue' + this.stats.rescued); }
+      if (b.info.type === 'cage') for (const a of G.actors.list) if (a.T.civilian && a.cageBid === bid && !a.freed) { a.freed = true; if (this.cfg.exit) a.follow = G.player; this.stats.rescued++; this.addXp(150); if (G.hud) G.hud.feed('MASON FREED', '#5ad0ff'); if (G.audio) G.audio.ui('star'); this.say('rescue' + this.stats.rescued); }
     }
     if (how === 'fall') { for (const a of G.actors.list) if (a.T.turret && !a.dead && Math.abs(a.pos.x - x) < 0.8 && Math.abs(a.pos.z - z) < 0.8 && a.pos.y - y < 1.2 && a.pos.y >= y) a.die(null, 'fall'); }
   }
@@ -188,7 +228,65 @@ export class Mission {
   onExplosiveKill() { this.stats.explosiveKills++; }
   onAlert(a) { if (a.team === 1 && !this.alarm && this.mode !== 'defend') { this.alarm = true; this.say('alert'); if (G.audio) G.audio.ui('alarm'); if (G.hud) G.hud.feed('YOU HAVE BEEN SPOTTED', '#ff5a3a'); } }
   onBossHalf(b) { this.say('bosshalf'); for (let i = 0; i < 5; i++) { const p = freeSpot(b.pos.x + rand(-9, 9), 0, b.pos.z + rand(-9, 9)); const a = G.actors.spawn(i < 2 ? 'elite' : 'guard', 1, p.x, p.y, p.z, { look: LOOKS.legion, hpMul: this.hpMul, dmgMul: this.dmgMul }); a.alert(G.player.pos, true); } if (G.audio) G.audio.ui('horn'); }
-  onHostageEscaped() { }
+  onHostageEscaped(a) { this.stats.escaped = (this.stats.escaped || 0) + 1; this.addXp(80); if (G.hud) G.hud.feed((a.named || 'VILLAGER') + ' IS SAFE', '#7ec8ff'); if (G.audio) G.audio.ui('star'); }
+  fail(why) { if (this.state !== 'play') return; this.state = 'failing'; if (G.hud) G.hud.banner('MISSION FAILED', '#ff4a3a', why); if (G.audio) G.audio.ui('alarm'); this.timers.push({ t: 2.2, fn: () => { this.state = 'play'; this.end(false, 'fail'); } }); }
+
+  // ---------------------------------------------------------------- scripted set pieces
+  runEvent(ev) {
+    switch (ev.do) {
+      case 'barrage': return this.barrage(ev);
+      case 'collapse': return this.collapse(ev);
+      case 'reinforce': return this.reinforce(ev);
+      case 'timer': { const o = { type: 'timer', text: ev.text, left: ev.sec, done: false, prog: '', keep: true, passive: true }; this.objs.push(o); if (G.hud) G.hud.banner(ev.text.toUpperCase(), '#ff6a3a', ev.sec + ' seconds'); return; }
+      case 'env': return G.r3.setEnv(ev.name);
+      case 'bark': { const a = this.named.get(ev.name); if (a) G.actors.bark(a, ev.text); return; }
+      case 'killAlly': { const a = this.named.get(ev.name); if (!a) return; this.timers.push({ t: ev.after || 0, fn: () => { if (a.dead) return; a.mortal = true; a.die(null, 'bullet', new THREE.Vector3(0, 0, 1), { part: 1, power: 4 }); if (ev.key) this.say(ev.key); } }); return; }
+    }
+  }
+  // shells whistle in, the impact point glows red for a second, then it goes off
+  barrage(ev) {
+    const p = G.player.pos, n = ev.n || 3, yaw = G.player.yaw;
+    for (let i = 0; i < n; i++) {
+      this.timers.push({ t: 0.2 + i * rand(0.35, 0.9), fn: () => {
+        let x, z;
+        for (let k = 0; k < 8; k++) {
+          if (ev.near === 'ahead') { const d = rand(7, 17); x = p.x - Math.sin(yaw) * d + rand(-6, 6); z = p.z - Math.cos(yaw) * d + rand(-6, 6); }
+          else { const a = rand(TAU), d = rand(4, 12); x = p.x + Math.cos(a) * d; z = p.z + Math.sin(a) * d; }
+          if (!G.actors.list.some((a) => a.team === 0 && !a.dead && (a.T.civilian || a.named) && Math.hypot(a.pos.x - x, a.pos.z - z) < 4.5)) break;
+        }
+        const y = Math.max(terrainH(x, z), G.world.groundAt(x, z, 30)), w = { x, y, z, t: 1.35 };
+        this.warnings.push(w); G.fx.warn(x, y, z, 1.35); if (G.audio) G.audio.incoming(x, y, z);
+        this.timers.push({ t: 1.35, fn: () => { this.warnings.splice(this.warnings.indexOf(w), 1); G.combat.explosion(x, y + 0.4, z, 4.4, 240, null, 1, true); } });
+      } });
+    }
+  }
+  // a building comes down in a rolling chain of blasts
+  collapse(ev) {
+    const P = G.player.pos, yaw = G.player.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    let cands = this.buildings.filter((b) => !b.dead && b.info.type !== 'hall' && (!ev.type || ev.type.includes(b.info.type)));
+    const score = (b) => { const dx = b.info.cx - P.x, dz = b.info.cz - P.z, d = Math.hypot(dx, dz); if (d < b.info.radius + 4 || d > 32) return 1e9; return ev.near === 'ahead' ? d - (dx * fx + dz * fz) * 1.5 : d; };
+    cands.sort((a, b) => score(a) - score(b));
+    for (let k = 0; k < (ev.n || 1) && k < cands.length; k++) {
+      const b = cands[k].info; if (score(cands[k]) >= 1e9) break;
+      for (let i = 0; i < 4; i++) this.timers.push({ t: k * 0.6 + i * 0.16, fn: () => G.combat.explosion(b.cx + rand(-1.5, 1.5), 0.6 + i * 1.3, b.cz + rand(-1.5, 1.5), Math.max(4, b.radius * 0.75), 900, null, 1, true) });
+    }
+  }
+  edgePoint(side) {
+    if (side === 'any') side = pick(['north', 'south', 'east', 'west']);
+    const t = rand(-26, 26);
+    return side === 'north' ? [t, -41] : side === 'south' ? [t, 41] : side === 'east' ? [41, t] : [-41, t];
+  }
+  reinforce(ev) {
+    let i = 0;
+    for (const [type, n] of ev.units) for (let k = 0; k < n; k++) {
+      this.timers.push({ t: (i++) * 0.35, fn: () => {
+        const [x, z] = this.edgePoint(ev.side || 'any');
+        const a = G.actors.spawn(type, 1, x, terrainH(x, z), z, { look: this.enemyLook, role: 'hunter', hpMul: this.hpMul, dmgMul: this.dmgMul, yaw: Math.atan2(-x, -z) });
+        a.alerted = true; a.react = 0.4; a.lastSeen.copy(G.player.pos); a.investigate = true; a.investT = 0;
+      } });
+    }
+    if (G.audio) G.audio.ui('horn'); if (G.hud) G.hud.feed('ENEMY REINFORCEMENTS', '#ff7a5a');
+  }
   onRaiderAtGoal(a, dt) {
     a.goalT = (a.goalT || 0) - dt; if (a.goalT > 0 || this.coreDestroyed) return; a.goalT = 0.8;
     const alive = this.corePieces.filter((id) => G.world.palive[id] && (G.world.pflag[id] & F_CORE));
@@ -275,6 +373,14 @@ export class Mission {
     if (this.dialogT <= 0 && this.dialogQ.length) { const d = this.dialogQ.shift(); this.dialogT = 2.2 + d.text.length * 0.055; if (G.hud) G.hud.subtitle(d.who, d.text, this.dialogT); if (G.audio) G.audio.ui('radio'); }
     for (const d of (this.cfg.dialog || [])) if (typeof d.at === 'number' && this.time >= d.at && !this.fired.has(d)) { this.fired.add(d); this.dialogQ.push(d); }
     if (this.state !== 'play') return;
+    for (const ev of (this.cfg.events || [])) {
+      if (typeof ev.at === 'number' && this.time >= ev.at && !this.evFired.has(ev)) { this.evFired.add(ev); this.runEvent(ev); }
+      if (ev.every && typeof ev.from === 'number' && this.time >= ev.from && !this.evFired.has(ev)) { this.evFired.add(ev); this.evEvery.push({ ev, t: 0.1 }); }
+    }
+    for (const e of this.evEvery) { e.t -= dt; if (e.t <= 0) { e.t = e.ev.every; this.runEvent(e.ev); } }
+    // reinforcements always have a rough idea where you are
+    this.huntT -= dt; if (this.huntT <= 0) { this.huntT = 3.5; for (const a of G.actors.list) if (a.role === 'hunter' && !a.dead && !a.los) { a.lastSeen.set(G.player.pos.x + rand(-4, 4), G.player.pos.y, G.player.pos.z + rand(-4, 4)); a.investigate = true; a.investT = 0; a.alerted = true; } }
+    this.dtObj = dt;
     if (!this.coreDestroyed && this.coreTotal && this.coreHealth() <= 0.4) this.shatterCore();
     if (this.mode === 'defend') this.updateWaves(dt);
     // objectives

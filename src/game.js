@@ -3,7 +3,8 @@ import { G, clamp, rand, randi, rng, hashStr } from './util.js';
 import { SDK } from './sdk.js';
 import { BP, starterVillage, genVillage, rivalIdentity, CLAN_COLORS } from './blueprints.js';
 import { WEAPONS, upgradeCost } from './weapons.js';
-import { STORY } from './story.js';
+import { STORY, BOND_PERK } from './story.js';
+import { footprint } from './blueprints.js';
 
 const SAVE_KEY = 'emberhold_save_v1';
 const DAY = 86400000;
@@ -33,7 +34,7 @@ export function defaultProfile() {
     v: 1, level: 1, xp: 0, trophies: 0, res: { gold: 1000, wood: 900, stone: 900, iron: 120, ember: 5 },
     village: starterVillage(), color: 1, weapons: { rifle: 1, pistol: 1, sledge: 1 }, primary: 'rifle',
     story: {}, stats: {}, quests: { day: 0, list: [] }, ach: {}, daily: { last: 0, streak: 0 },
-    lastTick: Date.now(), lastSeen: Date.now(), rivals: [], rivalSeed: (Math.random() * 1e9) | 0, supplyAt: 0, log: [], seenPrologue: false, hints: {},
+    lastTick: Date.now(), lastSeen: Date.now(), rivals: [], rivalSeed: (Math.random() * 1e9) | 0, supplyAt: 0, log: [], seenPrologue: false, hints: {}, bonds: { marek: 0, wren: 0, tobias: 0, ilka: 0 }, days: {}, pvp: { played: 0, won: 0 }, name: '',
     settings: { quality: -1, sens: 1, fov: 72, master: 0.8, music: 0.55, sfx: 1, invertY: false, showFps: false },
   };
 }
@@ -62,6 +63,7 @@ export class Game {
   count(type) { let n = 0; for (const b of this.p.village.b) if (b.t === type) n++; return n; }
   cap() { return 4000 + this.hallLevel() * 3000 + this.count('vault') * 4000; }
   prod() { const out = { gold: 0, wood: 0, stone: 0, iron: 0 }, k = 1 + (this.hallLevel() - 1) * 0.15; for (const b of this.p.village.b) { const pr = BP[b.t].prod; if (pr) for (const r in pr) out[r] += pr[r] * k; } out.gold += 60; return out; }
+  buildCost(cost) { if (!this.perk('tobias')) return cost; const o = {}; for (const k in cost) o[k] = Math.ceil(cost[k] * 0.9); return o; }
   canAfford(cost) { for (const k in cost) if ((this.p.res[k] || 0) < cost[k]) return false; return true; }
   spend(cost) { if (!this.canAfford(cost)) return false; for (const k in cost) this.p.res[k] -= cost[k]; this.save(); if (G.ui) G.ui.refreshTop(); return true; }
   addRes(obj, capped = false) { const cap = this.cap(); for (const k in obj) { if (!obj[k] || this.p.res[k] === undefined) continue; let v = this.p.res[k] + obj[k]; if (capped && k !== 'ember') v = Math.max(this.p.res[k], Math.min(cap, v)); this.p.res[k] = Math.max(0, Math.round(v)); } this.save(); if (G.ui) G.ui.refreshTop(); }
@@ -79,18 +81,6 @@ export class Game {
   offline() {
     const p = this.p, now = Date.now(), hrs = clamp((now - (p.lastTick || now)) / 3600000, 0, 10), out = { hours: hrs, gained: {}, raids: [] };
     if (hrs > 0.03) { const pr = this.prod(), before = Object.assign({}, p.res); const add = {}; for (const k in pr) add[k] = Math.round(pr[k] * hrs); this.addRes(add, true); for (const k in add) out.gained[k] = p.res[k] - before[k]; }
-    const away = (now - (p.lastSeen || now)) / 3600000;
-    if (away > 0.75 && this.stat('missions') >= 2) {
-      const r = rng((now / 60000) | 0), n = Math.min(2, 1 + (away > 5 ? 1 : 0)), D = this.defenceRating();
-      for (let i = 0; i < n; i++) {
-        if (r() > 0.75) continue;
-        const idn = rivalIdentity((r() * 1e9) | 0), held = r() < clamp(0.3 + D / (D + 70 + p.trophies * 0.3), 0.25, 0.9);
-        const rep = { name: idn.name, chief: idn.chief, held, t: now, lost: {}, trophies: 0, seed: (r() * 1e9) | 0, level: clamp(Math.round(this.power() + r.range(-1, 2)), 1, 20) };
-        if (held) rep.trophies = r.int(3, 8); else { rep.trophies = -r.int(4, 10); for (const k of ['gold', 'wood', 'stone']) { const l = Math.round(p.res[k] * r.range(0.05, 0.11)); rep.lost[k] = l; p.res[k] -= l; } }
-        p.trophies = Math.max(0, p.trophies + rep.trophies); out.raids.push(rep); p.log.unshift(rep);
-      }
-      p.log.length = Math.min(p.log.length, 8);
-    }
     p.lastTick = now; p.lastSeen = now; this.save(true);
     return out;
   }
@@ -162,9 +152,14 @@ export class Game {
         if (res.stars > prev) { rw.ember += (res.stars - prev); p.story[def.id] = res.stars; }
         if (!prev) { this.track('storyDone', 1); if (def.grant && !p.weapons[def.grant]) { p.weapons[def.grant] = 1; res.granted = WEAPONS[def.grant].name; } res.unlockText = def.unlockText; }
         let stars = 0; for (const k2 in p.story) stars += p.story[k2]; this.setMax('storyStars', stars);
+        res.dayInfo = this.applyDay(def);
       }
+    } else if (res.kind === 'pvp') {
+      const base = res.mode === 'duel' ? 1 : 1.2; rw.gold = Math.round((res.win ? 900 : 350) * base + s.kills * 40); rw.wood = res.win ? 400 : 150; rw.stone = res.win ? 400 : 150; rw.iron = Math.round(s.kills * 8);
+      rw.trophies = res.win ? 14 : -5; rw.xp += (res.win ? 500 : 200) + s.kills * 30; rw.ember = res.win ? 1 : 0; if (!p.pvp) p.pvp = { played: 0, won: 0 }; p.pvp.played++; if (res.win) p.pvp.won++;
     }
-    if (!res.win && res.kind !== 'raid') { rw.xp = Math.round(rw.xp * 0.5); }
+    if (!res.win && res.kind !== 'raid' && res.kind !== 'pvp') { rw.xp = Math.round(rw.xp * 0.5); }
+    if (this.perk('marek') && rw.gold > 0) rw.gold = Math.round(rw.gold * 1.1);
     p.trophies = Math.max(0, p.trophies + rw.trophies); this.setMax('trophyPeak', p.trophies);
     this.addRes({ gold: rw.gold, wood: rw.wood, stone: rw.stone, iron: rw.iron, ember: rw.ember });
     const before = { level: p.level, xp: p.xp, need: this.xpNeed() };
@@ -175,5 +170,28 @@ export class Game {
     if (G.onMissionEnd) G.onMissionEnd(m, res);
   }
   doubleReward(res) { const rw = res.reward; this.addRes({ gold: rw.gold, wood: rw.wood, stone: rw.stone, iron: rw.iron }); res.doubled = true; this.save(true); }
+  perk(who) { return ((this.p.bonds || {})[who] || 0) >= BOND_PERK; }
+  bond(who, n = 1) { const b = this.p.bonds || (this.p.bonds = {}); b[who] = Math.min(5, (b[who] || 0) + n); this.save(); }
+  // a new day: the story adds one building to the village (placed on the first free spot spiralling out from the hall)
+  growVillage(type) {
+    const v = this.p.village, C = 128, fp0 = footprint(type, 0), rects = [];
+    for (const b of v.b) { const fp = footprint(b.t, b.r); rects.push([b.x, b.z, fp[0], fp[1]]); }
+    for (const f of (v.f || [])) rects.push([f[1], f[3], f[4], f[6]]);
+    for (let ring = 6; ring < 110; ring += 4) for (let k = 0; k < 24; k++) {
+      const a = k / 24 * Math.PI * 2 + ring * 0.37, r = (k & 1) ? 0 : 1, fp = r ? [fp0[1], fp0[0]] : fp0;
+      const x = Math.round((C + Math.cos(a) * ring - fp[0] / 2) / 2) * 2, z = Math.round((C + Math.sin(a) * ring - fp[1] / 2) / 2) * 2;
+      if (x < 8 || z < 8 || x + fp[0] > 248 || z + fp[1] > 248) continue;
+      if (rects.some((q) => x < q[0] + q[2] + 2 && x + fp[0] + 2 > q[0] && z < q[1] + q[3] + 2 && z + fp[1] + 2 > q[1])) continue;
+      const rec = { t: type, x, z, r, l: 1 }; v.b.push(rec); this.save(true); return rec;
+    }
+    return null;
+  }
+  // after a chapter is won for the first time: grow the village, maybe upgrade the hall
+  applyDay(def) {
+    const d = def.day; if (!d || this.p.days[def.id]) return null;
+    this.p.days[def.id] = 1; const out = { day: d, rec: d.grow ? this.growVillage(d.grow) : null, hall: false };
+    if (d.hall) { const h = this.p.village.b.find((b) => b.t === 'hall'); if (h && (h.l || 1) < 5) { h.l = (h.l || 1) + 1; out.hall = true; } }
+    this.save(true); return out;
+  }
   storyUnlocked(i) { return i === 0 || !!this.p.story[STORY[i - 1].id]; }
 }

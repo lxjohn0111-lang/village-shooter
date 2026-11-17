@@ -149,12 +149,14 @@ export class WeaponSys {
       this.spawnProjectile(d.projectile, _v.clone().addScaledVector(dir, 0.6).addScaledVector(right, 0.12).addScaledVector(up, -0.08), dir, this.stats, player);
       if (this.model.mag && d.kind === 'rocket') this.model.mag.visible = false;
     } else {
-      const n = d.pellets || 1;
+      const n = d.pellets || 1, dirs = [];
       for (let i = 0; i < n; i++) {
         const a2 = rand(6.283), rr = Math.sqrt(Math.random()) * spread;
         const dir = _v2.clone().addScaledVector(right, Math.cos(a2) * rr).addScaledVector(up, Math.sin(a2) * rr).normalize();
+        dirs.push(dir);
         G.combat.fireBullet({ origin: _v, dir, dmg: this.stats.dmg, brick: this.stats.brick, range: d.range, shooter: player, team: 0, falloff: d.falloff, head: d.head, speed: d.vel * rand(0.97, 1.03), impulse: d.imp, vis: muzzle, shot: this.shotId, tracer: n === 1 || i % 2 === 0, kind: d.kind });
       }
+      if (G.mode && G.mode.onPlayerFire) G.mode.onPlayerFire(_v, dirs, d, this.stats, muzzle);
     }
     // recoil: the pattern actually moves your aim (and partly settles back); the visual kick is on top
     const rk = this.stats.recoil * (1 - this.adsT * 0.3) * (player.crouch ? 0.8 : 1) * (player.lean ? 1.1 : 1);
@@ -200,6 +202,7 @@ export class WeaponSys {
     const w = G.world;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i]; p.life -= dt;
+      if (!p.sent) { p.sent = true; if (!p.foreign && G.mode && G.mode.onProjectile) G.mode.onProjectile(p); }
       let boom = p.life <= 0;
       const g = p.type === 'rocket' ? 0.6 : 11;
       p.vel.y -= g * dt;
@@ -264,7 +267,7 @@ export class WeaponSys {
     // breath control for scoped rifles: hold Shift to steady
     const tt = G.r3.time; this.holding = false;
     if (this.adsT > 0.6 && !d.melee) {
-      let amp = d.scope ? 0.0052 : 0.0007; amp *= 1 + clamp(player.speed / 4, 0, 1) * 1.5; if (player.crouch) amp *= 0.6;
+      let amp = (d.scope ? 0.0052 : 0.0007) * (G.game && G.game.perk('wren') ? 0.7 : 1); amp *= 1 + clamp(player.speed / 4, 0, 1) * 1.5; if (player.crouch) amp *= 0.6;
       if (d.scope && inp.keys.ShiftLeft && !this.winded && this.breath > 0) { this.holding = true; amp *= 0.1; this.breath = Math.max(0, this.breath - dt / 4.5); if (this.breath <= 0) this.winded = true; }
       else { this.breath = Math.min(1, this.breath + dt / 6); if (this.winded) { amp *= 2.1; if (this.breath > 0.45) this.winded = false; } }
       player.swayP = (Math.sin(tt * 1.15) + Math.sin(tt * 2.3) * 0.4) * amp * this.adsT; player.swayY = Math.cos(tt * 0.82) * amp * 1.35 * this.adsT;

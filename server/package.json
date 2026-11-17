@@ -1,0 +1,11 @@
+{
+  "name": "emberhold-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Matchmaking and relay server for Emberhold multiplayer (Town Siege 4v4, Build & Battle 1v1).",
+  "main": "server.js",
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "8.18.0" }
+}

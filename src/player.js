@@ -6,6 +6,19 @@ import { Input } from './input.js';
 
 const R = 0.3;
 
+// touch aim assist: the look stick slows down while the crosshair sits on an enemy
+const _af = new THREE.Vector3();
+function aimFriction(p) {
+  let best = 1;
+  for (const a of G.actors.list) {
+    if (a.dead || a.team === 0 || a.T.civilian) continue;
+    _af.set(a.pos.x - p.eyePos.x, a.pos.y + a.height * 0.6 - p.eyePos.y, a.pos.z - p.eyePos.z); const d = _af.length(); if (d > 60 || d < 0.5) continue;
+    const c = _af.dot(p.fwd) / d, tol = Math.max(0.0012, 0.12 / d);
+    if (c > 1 - tol * 3) best = Math.min(best, c > 1 - tol ? 0.45 : 0.7);
+  }
+  return best;
+}
+
 export class Player {
   constructor() {
     this.pos = new THREE.Vector3(0, 0, 46); this.vel = new THREE.Vector3();
@@ -41,7 +54,8 @@ export class Player {
     this.invuln = Math.max(0, this.invuln - dt); this.lastHurt += dt;
     if (!this.dead && this.lastHurt > 4.5 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + 14 * dt);
     if (active && !this.dead) {
-      const sens = 0.0022 * (s.sens || 1) * (1 - this.adsT * (1 - this.fovMul) * 0.9);
+      let sens = 0.0022 * (s.sens || 1) * (1 - this.adsT * (1 - this.fovMul) * 0.9);
+      if (inp.touch && G.actors) sens *= aimFriction(this);
       const dP = -inp.mdy * sens * (s.invertY ? -1 : 1);
       this.yaw -= inp.mdx * sens; this.pitch += dP;
       if (dP < 0 && this.recAccP > 0) this.recAccP = Math.max(0, this.recAccP + dP);      // you pulled the muzzle down yourself: less to settle
@@ -54,13 +68,15 @@ export class Player {
       if (inp.keys.KeyW || inp.keys.ArrowUp) iz -= 1; if (inp.keys.KeyS || inp.keys.ArrowDown) iz += 1;
       if (inp.keys.KeyA || inp.keys.ArrowLeft) ix -= 1; if (inp.keys.KeyD || inp.keys.ArrowRight) ix += 1;
     }
-    const il = Math.hypot(ix, iz); if (il > 0) { ix /= il; iz /= il; }
+    let il = Math.hypot(ix, iz); if (il > 0) { ix /= il; iz /= il; }
+    // analogue stick (touch joystick): partial deflection walks slower
+    if (active && !this.dead && (inp.ax || inp.ay)) { ix = inp.ax; iz = inp.ay; il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; } }
     this.strafe = damp(this.strafe, ix, 8, dt);
     // lean out of cover with Q / E
     this.lean = active && !this.dead && this.onGround && !this.sprinting ? (inp.keys.KeyE ? 1 : 0) - (inp.keys.KeyQ ? 1 : 0) : 0;
     this.leanT = damp(this.leanT, this.lean, 11, dt); this.suppress = Math.max(0, this.suppress - dt * 0.55);
     const wantCrouch = active && (inp.keys.ControlLeft || inp.keys.KeyC);
-    const wantSprint = active && inp.keys.ShiftLeft && iz < 0 && !wantCrouch && this.adsT < 0.3;
+    const wantSprint = active && (inp.keys.ShiftLeft || inp.touch && iz < -0.93) && iz < 0 && !wantCrouch && this.adsT < 0.3;
     if (active && inp.pressed.KeyC || active && inp.pressed.ControlLeft) { if (this.sprinting && this.onGround && this.slideT <= 0 && this.speed > 5.5) { this.slideT = 0.75; } }
     // crouch / stand (needs headroom)
     if (wantCrouch || this.slideT > 0) this.crouch = true; else if (this.crouch && this.free(this.pos.x, this.pos.y, this.pos.z, 1.8)) this.crouch = false;

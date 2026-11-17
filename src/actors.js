@@ -67,6 +67,7 @@ export class Actor {
   // extra: { part: 0 legs | 1 torso | 2 head, power: ragdoll impulse, stagger }
   damage(amount, attacker, kind, dir, extra) {
     if (this.dead) return false;
+    if (this.puppet) { if (G.mode && G.mode.netHit) G.mode.netHit(this, amount, attacker, kind, dir, extra); return false; }
     const T = this.T, part = extra && extra.part !== undefined ? extra.part : (kind === 'head' ? 2 : 1);
     if (kind !== 'head' && T.armor) amount *= T.armor;
     if (kind === 'head' && T.boss) amount *= 0.5;
@@ -86,6 +87,7 @@ export class Actor {
     if (attacker && attacker.team !== this.team) { this.alert(attacker.pos, true); if (!this.target || this.seenT > 1) { this.target = attacker; this.lastSeen.copy(attacker.pos); this.seenT = 0; } this.suppress = Math.min(1, this.suppress + 0.3); }
     if (G.mode && attacker === G.player) G.mode.onDamageDealt(this, amount, kind);
     if (T.boss && !this.calledHelp && this.hp < this.maxHp * 0.5) { this.calledHelp = true; if (G.mode && G.mode.onBossHalf) G.mode.onBossHalf(this); }
+    if (this.hp <= 0 && this.named && !this.mortal && !T.civilian) { this.hp = this.maxHp * 0.35; this.downT = 6; this.stagger = 1.2; this.crouchT = 6; this.reloadT = Math.max(this.reloadT, 5); this.sys.bark(this, 'I\'M HIT!'); return false; }
     if (this.hp <= 0) { this.die(attacker, kind, dir, { part, power: extra && extra.power ? extra.power : (kind === 'explosion' ? 9 : 3) }); return true; }
     return false;
   }
@@ -97,7 +99,7 @@ export class Actor {
       this.rag = new Ragdoll(this, { dir: dir || null, power: extra ? extra.power : 3, part: extra ? extra.part : 1, kind });
       this.sys.corpses.push(this);
       if (G.audio) G.audio.deathCry(this.pos.x, this.pos.y + 1.5, this.pos.z, T.scale);
-      if (this.team !== 0 && !T.civilian && Math.random() < 0.16) this.sys.dropPickup('med', this.pos.x, this.pos.y, this.pos.z);
+      if (this.team !== 0 && !T.civilian && !this.netId && Math.random() < 0.16) this.sys.dropPickup('med', this.pos.x, this.pos.y, this.pos.z);
     }
     if (G.mode) G.mode.onActorKilled(this, attacker, kind);
   }
@@ -192,6 +194,7 @@ export class Actor {
     let sp = T.spread * (T.static ? 1 : t === G.player ? 1.65 : 1.2) * (1 + tv * 0.16) * (1 + Math.max(0, 1.4 - this.alertT) * 1.2) * (1 + this.suppress * 1.3) / (G.diffAcc || 1);
     if (t === G.player && t.crouch) sp *= 1.2;
     _o.set(ex, ey, ez); _d.set(tx - ex + rand(-1, 1) * sp * dist, ty - ey + rand(-1, 1) * sp * dist * 0.7 + dist * dist / (T.vel * T.vel) * 4.9, tz - ez + rand(-1, 1) * sp * dist).normalize();
+    this.lastFired = G.r3.time; if (G.mode && G.mode.onActorFire) G.mode.onActorFire(this, _o, _d);
     G.combat.fireBullet({ origin: _o, dir: _d, dmg: T.dmg * this.dmgMul, brick: T.turret ? 0.5 : 0.4, range: T.range * 1.5, shooter: this, team: this.team, head: 1.5, speed: T.vel, impulse: 2.5, tracer: true, color: this.team === 0 ? [0.6, 0.85, 1] : [1, 0.5, 0.25], kind: T.snd });
     G.fx.muzzleFlash(ex + _d.x * 0.3, ey + _d.y * 0.3, ez + _d.z * 0.3, T.snd === 'sniper' ? 1.6 : 1);
     if (Math.random() < 0.4) G.r3.flashLight(_o, 0xffa050, 14, 0.05, 10);
@@ -272,6 +275,7 @@ export class Actor {
       const alive = this.rag.update(dt); this.rag.center(this.pos);
       return alive;
     }
+    if (this.puppet) { this.puppetStep(dt); this.pose(dt); return true; }
     this.alertT += dt; this.seenT += dt; this.investT += dt; this.suppress = Math.max(0, this.suppress - dt * 0.33); this.stagger = Math.max(0, this.stagger - dt); this.pathT -= dt; this.tactT -= dt;
     const px0 = this.pos.x, pz0 = this.pos.z;
     // --- gravity / support
@@ -304,7 +308,8 @@ export class Actor {
         if (gd >= 3.5 && !this.followPath(dt, T.speed)) {
           if (!this.path) { const dx = (gl.x - this.pos.x) / gd, dz = (gl.z - this.pos.z) / gd; if (!this.tryMove(dx * T.speed * dt, dz * T.speed * dt)) this.breach(dt, dx, dz); this.moveX = dx; this.moveZ = dz; this.moving = 1; }
         }
-      } else if (t && (this.los || this.aware)) this.combatMove(dt, t);
+      } else if (t && (this.los || this.aware) && !(this.follow && Math.hypot(this.follow.pos.x - this.pos.x, this.follow.pos.z - this.pos.z) > 12)) this.combatMove(dt, t);
+      else if (this.follow) this.followMove(dt);
       else if (this.alerted && (t || this.investigate) && (this.seenT < 25 || this.investT < 20) && !this.hold) {
         // hunt toward last known position
         this.cover = null; this.atCover = false;
@@ -341,10 +346,41 @@ export class Actor {
     this.pose(dt);
     return true;
   }
+  // keep up with the player: run when far, walk when near, stop a few metres away
+  followMove(dt) {
+    const f = this.follow.pos, d = Math.hypot(f.x - this.pos.x, f.z - this.pos.z); this.cover = null; this.atCover = false;
+    if (d < 3.2) { this.path = null; return; }
+    const sp = this.T.speed * (d > 8 ? 1.25 : 0.85);
+    if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = 1; this.path = G.nav.path(this.pos.x, this.pos.z, f.x, f.z, 0); this.pathI = 0; }
+    if (!this.followPath(dt, sp)) { const dx = (f.x - this.pos.x) / d, dz = (f.z - this.pos.z) / d; this.tryMove(dx * sp * dt, dz * sp * dt); this.moveX = dx; this.moveZ = dz; this.moving = 1; }
+    if (d > 30) { const p = this.follow.pos; this.pos.set(p.x - Math.sin(G.player.yaw) * -3, this.pos.y, p.z - Math.cos(G.player.yaw) * -3); }      // got hopelessly stuck: catch up
+  }
+  // a body driven by network snapshots: glide toward the last reported state
+  puppetStep(dt) {
+    const n = this.net; if (!n) return;
+    const k = Math.min(1, dt * 12), dx = n.x - this.pos.x, dz = n.z - this.pos.z;
+    if (dx * dx + dz * dz > 36) { this.pos.set(n.x, n.y, n.z); } else { this.pos.x += dx * k; this.pos.y += (n.y - this.pos.y) * k; this.pos.z += dz * k; }
+    let dy = n.yaw - this.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; this.yaw += dy * k;
+    this.aimPitch += (n.pitch - this.aimPitch) * k;
+    this.moving = n.mv ? 1 : 0; this.moveX = n.mx; this.moveZ = n.mz; this.crouchT = n.c ? 0.3 : 0;
+    this.reloadT = n.rl ? Math.max(this.reloadT, 0.4) : -1; if (this.reloadT >= 0) this.reloadT -= dt;
+    this.alerted = true; this.investigate = true; this.velX = dx / Math.max(dt, 0.016) * k; this.velZ = dz / Math.max(dt, 0.016) * k;
+  }
   goalDist() { const g = this.goal || this.post; return Math.hypot(g.x - this.pos.x, g.z - this.pos.z); }
 
   updateCivilian(dt) {
-    if (!this.freed) return;
+    if (!this.freed || this.escaped) return;
+    const ex = G.mode && G.mode.cfg && G.mode.cfg.exit;
+    if (this.follow && ex) {
+      const de = Math.hypot(ex.x - this.pos.x, ex.z - this.pos.z), f = this.follow.pos, pe = Math.hypot(ex.x - f.x, ex.z - f.z);
+      if (de < ex.r) { this.escaped = true; this.noHit = true; this.P.root.visible = false; if (G.mode.onHostageEscaped) G.mode.onHostageEscaped(this); return; }
+      const goal = pe < ex.r + 9 ? ex : f, dg = Math.hypot(goal.x - this.pos.x, goal.z - this.pos.z);
+      if (goal === f && dg < 2.6) { this.path = null; return; }
+      const sp = dg > 7 ? 5.6 : 4;
+      if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = 1.1; this.path = G.nav.path(this.pos.x, this.pos.z, goal.x, goal.z, 0); this.pathI = 0; }
+      if (!this.followPath(dt, sp)) { this.tryMove((goal.x - this.pos.x) / dg * sp * dt, (goal.z - this.pos.z) / dg * sp * dt); this.moveX = (goal.x - this.pos.x) / dg; this.moveZ = (goal.z - this.pos.z) / dg; this.moving = 1; }
+      return;
+    }
     const gl = this.goal || { x: 0, z: 60 };
     if (this.pathT <= 0 && this.sys.navBudget > 0) { this.sys.navBudget--; this.pathT = 2.5; this.path = G.nav.path(this.pos.x, this.pos.z, gl.x, gl.z, 0); this.pathI = 0; }
     if (!this.followPath(dt, this.T.speed)) { const d = Math.hypot(gl.x - this.pos.x, gl.z - this.pos.z); if (d > 2) { this.tryMove((gl.x - this.pos.x) / d * this.T.speed * dt, (gl.z - this.pos.z) / d * this.T.speed * dt); this.moveX = (gl.x - this.pos.x) / d; this.moveZ = (gl.z - this.pos.z) / d; this.moving = 1; } else if (!this.escaped) { this.escaped = true; this.noHit = true; this.P.root.visible = false; if (G.mode && G.mode.onHostageEscaped) G.mode.onHostageEscaped(this); } }
@@ -436,14 +472,14 @@ export class Actors {
     while (this.corpses.length > 10) this.corpses.shift().rag.expire();
     // soft separation
     const L = this.list;
-    for (let i = 0; i < L.length; i++) { const a = L[i]; if (a.dead || a.T.static) continue; for (let j = i + 1; j < L.length; j++) { const b = L[j]; if (b.dead || b.T.static) continue; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d2 = dx * dx + dz * dz; if (d2 < 0.36 && d2 > 1e-5 && Math.abs(a.pos.y - b.pos.y) < 1) { const d = Math.sqrt(d2), p = (0.6 - d) * 0.5; a.tryMove(-dx / d * p, -dz / d * p); b.tryMove(dx / d * p, dz / d * p); } } }
+    for (let i = 0; i < L.length; i++) { const a = L[i]; if (a.dead || a.T.static || a.puppet) continue; for (let j = i + 1; j < L.length; j++) { const b = L[j]; if (b.puppet || b.dead || b.T.static) continue; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d2 = dx * dx + dz * dz; if (d2 < 0.36 && d2 > 1e-5 && Math.abs(a.pos.y - b.pos.y) < 1) { const d = Math.sqrt(d2), p = (0.6 - d) * 0.5; a.tryMove(-dx / d * p, -dz / d * p); b.tryMove(dx / d * p, dz / d * p); } } }
     const p = G.player;
     for (let i = this.mines.length - 1; i >= 0; i--) {
       const m = this.mines[i]; if (m.dead) { if (!m.mesh.parent) this.mines.splice(i, 1); continue; }
       let trig = false;
       if (m.team !== 0 && p && !p.dead && Math.hypot(p.pos.x - m.x, p.pos.z - m.z) < 1.25 && Math.abs(p.pos.y - m.y) < 1) trig = true;
-      if (!trig) for (const a of L) if (!a.dead && a.team !== m.team && !a.T.static && Math.hypot(a.pos.x - m.x, a.pos.z - m.z) < 1.25 && Math.abs(a.pos.y - m.y) < 1) { trig = true; break; }
-      if (trig) { if (G.audio) G.audio.ui('beep'); m.dead = true; this.timers.push({ t: 0.28, fn: () => this.detonate(m) }); }
+      if (!trig) for (const a of L) if (!a.dead && !a.puppet && a.team !== m.team && !a.T.static && Math.hypot(a.pos.x - m.x, a.pos.z - m.z) < 1.25 && Math.abs(a.pos.y - m.y) < 1) { trig = true; break; }
+      if (trig) { if (G.audio) G.audio.ui('beep'); m.dead = true; this.timers.push({ t: 0.28, fn: () => this.detonate(m) }); if (G.mode && G.mode.onMineTriggered) G.mode.onMineTriggered(m); }
     }
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const k = this.pickups[i]; k.t += dt; k.mesh.rotation.y += dt * 1.5; k.mesh.position.y = k.y + 0.32 + Math.sin(k.t * 3) * 0.06;

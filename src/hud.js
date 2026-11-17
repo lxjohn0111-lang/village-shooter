@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { G, clamp, fmtTime } from './util.js';
 import { WEAPONS } from './weapons.js';
+import { Input } from './input.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -11,6 +12,10 @@ export class HUD {
     this.el = $('hud'); this.x = $('xhair'); this.hit = $('hitm'); this.objs = $('objs'); this.feedEl = $('feed'); this.bannerEl = $('banner'); this.toastEl = $('toast');
     this.sub = $('subtitle'); this.radar = $('radar').getContext('2d'); this.markers = $('markers'); this.dmgdir = $('dmgdir'); this.dmgnums = $('dmgnums');
     this.barks = []; this.cook = document.createElement('div'); this.cook.id = 'cook'; this.el.appendChild(this.cook); this.breathEl = document.createElement('div'); this.breathEl.id = 'breath'; this.breathEl.innerHTML = '<i></i>'; this.el.appendChild(this.breathEl);
+    this.pvpTop = document.createElement('div'); this.pvpTop.id = 'pvptop'; $('topc').appendChild(this.pvpTop);
+    this.pvpHearts = document.createElement('div'); this.pvpHearts.id = 'pvphearts'; $('topc').appendChild(this.pvpHearts);
+    this.board = document.createElement('div'); this.board.id = 'scoreboard'; this.el.appendChild(this.board);
+    this.hintEl = document.createElement('div'); this.hintEl.id = 'hint'; this.el.appendChild(this.hintEl); this.hintT = 0;
     this.hitT = 0; this.toastT = 0; this.toastKey = ''; this.bannerT = 0; this.subT = 0; this.streakT = 0; this.dirs = []; this.slow = 0; this.cache = {}; this.markerEls = []; this.warnT = 0; this.promptText = '';
   }
   show(on) { this.el.classList.toggle('hidden', !on); if (on) { this.feedEl.innerHTML = ''; this.dmgnums.innerHTML = ''; this.cache = {}; this.bannerEl.classList.remove('on'); this.sub.classList.remove('on'); this.toastEl.style.opacity = 0; $('streak').style.opacity = 0; for (const d of this.dirs) d.el.remove(); this.dirs = []; for (const b of this.barks) b.el.remove(); this.barks = []; this.cook.style.display = 'none'; this.breathEl.style.display = 'none'; } }
@@ -27,6 +32,7 @@ export class HUD {
   sniperWarn(a, f) { this.warnT = 0.2; const w = $('warn'); w.textContent = '◆ MARKSMAN AIMING ◆'; w.style.opacity = 0.4 + f * 0.6; }
   // short shouted callouts floating over a soldier's head ("RELOADING!", "FRAG OUT!")
   bark(a, text) { if (this.el.classList.contains('hidden')) return; const p = G.player; if (!p || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) > 45) return; const el = document.createElement('i'); el.className = 'bark' + (a.team === 0 ? ' ally' : ''); el.textContent = text; this.markers.appendChild(el); this.barks.push({ a, el, t: 1.7 }); if (this.barks.length > 4) this.barks.shift().el.remove(); }
+  hint(text, dur = 6) { this.hintEl.textContent = text; this.hintEl.style.opacity = 1; this.hintT = dur; }
   prompt(html) { const p = $('prompt'); if (html !== this.promptText) { this.promptText = html; p.innerHTML = html; p.style.display = html ? 'block' : 'none'; } }
 
   update(dt) {
@@ -62,6 +68,9 @@ export class HUD {
     if (w.cookT >= 0) { const left = Math.max(0, 3.2 - w.cookT); this.cook.style.display = 'block'; this.cook.textContent = 'COOKING  ' + left.toFixed(1) + 's — RELEASE G TO THROW'; this.cook.style.color = left < 1 ? '#ff4030' : '#ffd24a'; } else if (this.cook.style.display !== 'none') this.cook.style.display = 'none';
     if (d.scope && w.adsT > 0.9) { this.breathEl.style.display = 'block'; const bi = this.breathEl.firstChild; bi.style.width = (w.breath * 100) + '%'; bi.style.background = w.winded ? '#ff4030' : w.holding ? '#6fe07f' : '#fff'; } else if (this.breathEl.style.display !== 'none') this.breathEl.style.display = 'none';
     this.slow -= dt; if (this.slow > 0) { this.drawMarkers(m, cam); return; } this.slow = 0.12;
+    if (this.hintT > 0) { this.hintT -= 0.12; if (this.hintT <= 0) this.hintEl.style.opacity = 0; }
+    if (m.kind === 'pvp') { this.updatePvp(m); this.drawRadar(p, m); this.drawMarkers(m, cam); return; }
+    this.set(this.pvpTop, 'pvpt', ''); this.set(this.pvpHearts, 'pvph', '');
     // objectives
     let h = '<div class="t">' + (m.kind === 'raid' ? 'RAID — ' + (m.cfg.rival ? m.cfg.rival.name.toUpperCase() : '') : m.kind === 'defend' ? 'VILLAGE DEFENCE' : (m.cfg.title || '').toUpperCase()) + '</div>';
     for (const o of m.objs) h += `<div class="o${o.done ? ' done' : ''}">${o.text}${o.prog ? ' <b>' + o.prog + '</b>' : ''}</div>`;
@@ -82,6 +91,17 @@ export class HUD {
     this.drawRadar(p, m); this.drawMarkers(m, cam);
   }
 
+  updatePvp(m) {
+    const I = m.hudInfo();
+    this.set('timer', 'timer', I.top); this.set('stars', 'stars', ''); $('corebar').style.display = 'none';
+    this.set(this.pvpTop, 'pvpt', I.score);
+    this.set(this.pvpHearts, 'pvph', ['YOUR SHRINE', 'THEIR SHRINE'].map((n, i) => `<div><span>${n}</span><i><b style="width:${Math.round(clamp((I.hearts[i] - 0.4) / 0.6, 0, 1) * 100)}%;background:${I.colors[i]}"></b></i></div>`).join(''));
+    this.set(this.objs, 'objs', '');
+    this.el.classList.toggle('building', m.phase === 'build');
+    const showBoard = !!(Input.keys.Tab);
+    this.board.classList.toggle('on', showBoard);
+    if (showBoard) this.set(this.board, 'board', '<div class="sboard">' + m.rows().map((r) => `<div class="${r.me ? 'me' : ''}" style="border-left-color:${r.team === 0 ? '#4aa8ff' : '#ff5a47'}"><span>${r.name}${r.human ? '' : ' <small>bot</small>'}</span><b>${r.k}</b><b>${r.d}</b></div>`).join('') + '</div>');
+  }
   drawRadar(p, m) {
     const c = this.radar, S = 150, R = 68, range = 48;
     c.clearRect(0, 0, S, S); c.save(); c.translate(S / 2, S / 2);
@@ -92,7 +112,7 @@ export class HUD {
     // village footprint hint
     for (const b of m.buildings || []) if (!b.dead) plot(b.info.cx, b.info.cz, 'rgba(255,255,255,.13)', clamp(b.info.radius / range * R * 0.7, 1.5, 9), false);
     for (const mk of m.markers()) plot(mk.x, mk.z, mk.col, 3.2, true);
-    for (const a of G.actors.list) { if (a.dead) continue; if (a.team === 0) plot(a.pos.x, a.pos.z, a.T.civilian ? '#9fe8ff' : '#4aa8ff', 2.4, false); else if (a.alerted || a.seenT < 4 || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) < 14) plot(a.pos.x, a.pos.z, a.T.boss ? '#ff00aa' : '#ff3a2a', a.T.boss ? 4 : 2.6, false); }
+    for (const a of G.actors.list) { if (a.dead) continue; if (a.team === 0) plot(a.pos.x, a.pos.z, a.T.civilian ? '#9fe8ff' : '#4aa8ff', 2.4, false); else if (m.kind === 'pvp' ? (G.r3.time - (a.lastFired || -99) < 2.5 || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) < 10) : a.alerted || a.seenT < 4 || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) < 14) plot(a.pos.x, a.pos.z, a.T.boss ? '#ff00aa' : '#ff3a2a', a.T.boss ? 4 : 2.6, false); }
     c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(0, 2.5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
     c.restore();
   }
