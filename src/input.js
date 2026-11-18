@@ -3,7 +3,7 @@ import { G } from './util.js';
 
 export const Input = {
   keys: {}, pressed: {}, released: {}, mdx: 0, mdy: 0, wheel: 0, buttons: [false, false, false], bPressed: [false, false, false], bReleased: [false, false, false],
-  locked: false, wantLock: false, virtual: false, noLock: false, skipMove: 0, ax: 0, ay: 0, touch: false,
+  locked: false, wantLock: false, virtual: false, noLock: false, skipMove: 0, ax: 0, ay: 0, touch: false, lockPending: false, lockFails: 0,
   init(canvas) {
     this.canvas = canvas;
     window.addEventListener('keydown', (e) => {
@@ -19,6 +19,8 @@ export const Input = {
     canvas.addEventListener('mousedown', (e) => {
       if (G.audio) G.audio.resume();
       if (this.wantLock && !this.locked) { this.lock(); return; }
+      // steering with the free cursor (lock was refused or never had a click to go with): this click can capture the mouse for real
+      if (this.virtual && !this.touch && !this.noLock && this.wantLock && !this.lockPending) { this.requestReal(); return; }
       if (e.button < 3) { this.buttons[e.button] = true; this.bPressed[e.button] = true; }
       e.preventDefault();
     });
@@ -28,19 +30,40 @@ export const Input = {
     window.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === canvas; if (this.locked) this.skipMove = 1;
-      if (!this.locked) { this.buttons = [false, false, false]; if (G.onPointerUnlock) G.onPointerUnlock(); }
-      else if (G.onPointerLock) G.onPointerLock();
+      this.lockPending = false;
+      if (document.pointerLockElement === canvas) {
+        this.lockFails = 0; this.skipMove = 1; this.locked = true;
+        if (this.virtual) { this.virtual = false; this.canvas.style.cursor = ''; return; }   // free-cursor steering upgraded to a real lock
+        if (G.onPointerLock) G.onPointerLock(); return;
+      }
+      if (this.virtual) return;
+      this.locked = false; this.buttons = [false, false, false]; if (G.onPointerUnlock) G.onPointerUnlock();
     });
-    document.addEventListener('pointerlockerror', () => this.fallback());
+    document.addEventListener('pointerlockerror', () => this.fallback(true));
   },
   lock() {
-    if (this.locked) return;
+    if (this.locked && !this.virtual) return;
     if (this.noLock) { this.setVirtual(true); return; }
-    try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => this.fallback()); } catch (e) { this.fallback(); }
+    // browsers only grant pointer lock right after a click or key press; the opening scene starts on its own,
+    // so steer with the free cursor until the player clicks into the game
+    const ua = navigator.userActivation;
+    if (ua && !ua.isActive) { this.setVirtual(true); return; }
+    this.requestReal();
   },
-  // when the page's frame refuses pointer lock, steer with plain mouse movement over the canvas instead
-  fallback() { if (this.locked && !this.virtual) return; this.noLock = true; this.setVirtual(true); },
+  requestReal() {
+    if (document.pointerLockElement === this.canvas) return;
+    this.lockPending = true;
+    try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => this.fallback(true)); } catch (e) { this.fallback(true); }
+  },
+  // refused (no gesture, Esc pressed a moment ago, or a frame that forbids it): keep playing with the free cursor and try
+  // again on the next click; only a frame that keeps refusing clicks is given up on
+  fallback(counts) {
+    if (!this.lockPending && counts) return;          // the promise and the error event report the same failure
+    this.lockPending = false;
+    if (document.pointerLockElement === this.canvas) return;
+    if (counts && ++this.lockFails >= 3) this.noLock = true;
+    if (this.wantLock) this.setVirtual(true);
+  },
   setVirtual(on) {
     if (this.virtual === on) return;
     this.virtual = on; this.locked = on; this.canvas.style.cursor = on && !this.touch ? 'none' : '';

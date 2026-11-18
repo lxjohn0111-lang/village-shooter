@@ -65,7 +65,7 @@ async function boot() {
   G.onEnvChange = (e) => { G.fx.setEnv(e); if (G.audio) G.audio.setAmbience(e.amb); };
   G.player = new Player(); G.weapons = new WeaponSys(G.r3.camera); G.actors = new Actors();
   G.build = new BuildMode(); G.hud = new HUD(); G.ui = new UI();
-  Input.init(canvas);
+  Input.init(canvas); G.input = Input;
   if (touch) { Input.touch = true; Input.noLock = true; document.body.classList.add('touch'); G.touch = new Touch(); if (SDK.env !== 'crazygames') orientationGuard(); }
   G.onPieceGone = (...a) => { if (G.mode && G.state === 'play') G.mode.onPieceGone(...a); };
   G.onCollapse = (...a) => { if (G.mode && G.state === 'play') G.mode.onCollapse(...a); };
@@ -138,7 +138,7 @@ async function startMission(cfg, mission) {
   SDK.gameplayStart();
   G.hud.hint('', 0);
   if (!mission) G.hud.banner(cfg.title || '', '#ffffff', cfg.sub || '');
-  if (cfg.storyDef && cfg.storyDef.id === 's1' && !G.profile.story.s1) G.hud.hint(Input.touch ? 'Left side: move  ·  Right side: look  ·  FIRE to shoot' : 'WASD move  ·  Mouse aim  ·  Click to fire  ·  Right-click to aim', 9);
+  if (cfg.storyDef && cfg.storyDef.id === 's1' && !G.profile.story.s1) G.hud.hint(Input.touch ? 'Left side: move  ·  Right side: look  ·  FIRE to shoot' : (Input.virtual ? 'Click to take the mouse  ·  ' : '') + 'WASD move  ·  Mouse aim  ·  Click to fire  ·  Right-click to aim', 9);
   await fade(false);
   G.busy = false; G.startGrace = 0.8;
 }
