@@ -71,10 +71,10 @@ export class UI {
   p_story() {
     const g = G.game, p = G.profile; if (this.sel.story === undefined) { const n = STORY.findIndex((s, i) => !p.story[s.id] && g.storyUnlocked(i)); this.sel.story = n >= 0 ? n : 0; }
     const si = this.sel.story, s = STORY[si];
-    let list = ''; STORY.forEach((m, i) => { const un = g.storyUnlocked(i); list += `<div class="card ${un ? 'click' : 'lock'} ${i === si ? 'sel' : ''}" data-a="${un ? 'selstory' : ''}" data-v="${i}"><div class="num">${i + 1}</div><div class="g"><h3>${m.title}</h3></div>${stars(p.story[m.id] || 0)}</div>`; });
+    let list = ''; STORY.forEach((m, i) => { const un = g.storyUnlocked(i); list += `<div class="card ${un ? 'click' : 'lock'} ${i === si ? 'sel' : ''}" data-a="${un ? 'selstory' : ''}" data-v="${i}"><div class="num">${i + 1}</div><div class="g"><h3>${m.title}</h3>${stars(p.story[m.id] || 0)}</div></div>`; });
     const detail = `<div class="sec">${s.sub}</div><h2>${s.title}</h2><p class="brief">${s.short}</p><div class="rw" style="justify-content:flex-start">${rewardHtml(s.reward)}</div>`;
     return `<div class="ph"><h2>Campaign</h2><span class="tag o">${Object.values(p.story).reduce((a, b) => a + b, 0)} / 30 ★</span></div>
-      <div class="pb"><div class="grid2"><div>${list}</div><div>${detail}</div></div></div>
+      <div class="pb"><div class="grid2 story"><div class="slist">${list}</div><div>${detail}</div></div></div>
       <div class="pf"><button class="btn pri" data-a="deploy" data-v="${si}">Play</button></div>`;
   }
   a_selstory(v) { this.sel.story = +v; this.renderPanel(); }
@@ -83,8 +83,8 @@ export class UI {
     const p = G.profile, rec = p.pvp || { played: 0, won: 0 };
     const card = (k, line) => { const M_ = MODES[k]; return `<div class="card mp"><div class="g"><h3>${M_.name} <span class="tag o">${M_.size}</span></h3><p>${line}</p></div><button class="btn pri" data-a="mp" data-v="${k}">Play</button></div>`; };
     return `<div class="ph"><h2>Multiplayer</h2><span class="tag">${rec.won} W · ${rec.played - rec.won} L</span></div><div class="pb">
-      ${card('siege', 'Big town, two shrines. Shatter theirs.')}
-      ${card('duel', '60 s to build, then fight. 2 bots each.')}
+      <div class="mpgrid">${card('siege', 'Big town, two shrines. Shatter theirs.')}
+      ${card('duel', '60 s to build, then fight. 2 bots each.')}</div>
       <p class="note">Empty slots fill with bots after 20 s.</p></div>`;
   }
   a_mp(v) { G.startMultiplayer(v); }
@@ -96,7 +96,7 @@ export class UI {
   a_defend() { G.startDefend(); }
   p_armory() {
     const p = G.profile, g = G.game; if (!this.sel.wep) this.sel.wep = p.primary; const ids = [...PRIMARIES, 'pistol', 'sledge'];
-    let list = ''; for (const id of ids) { const w = WEAPONS[id], own = g.owns(id); list += `<div class="card click ${this.sel.wep === id ? 'sel' : ''} ${!own && p.level < w.unlock ? 'lock' : ''}" data-a="selwep" data-v="${id}"><div class="g"><h3>${w.name}</h3><p>${w.cls}${own ? ' · MK ' + p.weapons[id] : p.level < w.unlock ? ' · Unlocks at level ' + w.unlock : ''}</p></div>${p.primary === id ? '<span class="tag o">Equipped</span>' : own ? '' : '<span class="tag">' + (p.level < w.unlock ? 'Locked' : fmt(w.cost) + ' gold') + '</span>'}</div>`; }
+    let list = ''; for (const id of ids) { const w = WEAPONS[id], own = g.owns(id); list += `<div class="card click ${this.sel.wep === id ? 'sel' : ''} ${p.primary === id ? 'eq' : ''} ${!own && p.level < w.unlock ? 'lock' : ''}" data-a="selwep" data-v="${id}"><div class="g"><h3>${w.name}</h3><p>${w.cls}${own ? ' · MK ' + p.weapons[id] : p.level < w.unlock ? ' · Unlocks at level ' + w.unlock : ''}</p></div>${p.primary === id ? '<span class="tag o">Equipped</span>' : own ? '' : '<span class="tag">' + (p.level < w.unlock ? 'Locked' : fmt(w.cost) + ' gold') + '</span>'}</div>`; }
     const id = this.sel.wep, w = WEAPONS[id], own = g.owns(id), lvl = p.weapons[id] || 1, st = weaponStats(id, lvl), nx = weaponStats(id, Math.min(5, lvl + 1));
     const bar = (label, v, v2, max, txt) => `<div class="statrow"><span>${label}</span><div class="bar"><i class="up" style="width:${clamp(v2 / max * 100, 0, 100)}%"></i><i style="width:${clamp(v / max * 100, 0, 100)}%"></i></div><b>${txt}</b></div>`;
     const dps = (s) => s.dmg * (w.pellets || 1);
@@ -106,7 +106,7 @@ export class UI {
     let foot = '';
     if (!own) foot = p.level < w.unlock ? `<span class="tag">Reach level ${w.unlock}</span>` : `${costHtml({ gold: w.cost })}<button class="btn pri" data-a="buywep" data-v="${id}">Buy</button>`;
     else { if (lvl < 5) { const c = upgradeCost(id, lvl); foot += `${costHtml(c)}<button class="btn" data-a="upwep" data-v="${id}">Upgrade to MK ${lvl + 1}</button>`; } else foot += '<span class="tag o">Fully upgraded</span>'; if (PRIMARIES.includes(id) && p.primary !== id) foot += `<button class="btn pri" data-a="equip" data-v="${id}">Equip</button>`; }
-    return `<div class="ph"><h2>Armory</h2></div><div class="pb"><div class="grid2"><div>${list}</div><div>${d}</div></div></div><div class="pf">${foot}</div>`;
+    return `<div class="ph"><h2>Armory</h2></div><div class="pb"><div class="grid2"><div class="wlist">${list}</div><div>${d}</div></div></div><div class="pf">${foot}</div>`;
   }
   a_selwep(v) { this.sel.wep = v; this.renderPanel(); }
   a_buywep(v) { if (G.game.buyWeapon(v)) { G.audio.ui('levelup'); G.game.equip(v); } else G.audio.ui('deny'); this.renderPanel(); }
@@ -116,11 +116,12 @@ export class UI {
     const p = G.profile, g = G.game; let h = '<div class="daily">';
     const day = Math.floor(Date.now() / 864e5), streak = p.daily.last === day ? p.daily.streak : (p.daily.last === day - 1 ? p.daily.streak : 0), cur = (p.daily.last === day ? streak - 1 : streak) % 7;
     DAILY.forEach((rw, i) => { h += `<div class="${i < cur || (i === cur && p.daily.last === day) ? 'got' : i === cur ? 'now' : ''}">${i + 1}<b>${RES.filter((k) => rw[k]).map((k) => `<i class="ic ${k}"></i>${fmt(rw[k])}`).join(' ')}</b></div>`; });
-    h += `</div>${g.dailyReady() ? '<div class="row" style="margin-top:8px"><button class="btn pri sm" data-a="daily">Claim</button></div>' : ''}<div class="sec">Today</div>`;
+    h += `</div>${g.dailyReady() ? '<div class="row" style="margin-top:8px"><button class="btn pri sm" data-a="daily">Claim</button></div>' : ''}<div class="qcols"><div><div class="sec">Today</div>`;
     p.quests.list.forEach((q, i) => { h += `<div class="card"><div class="g"><h3>${q.text}</h3><div class="bar" style="margin-top:6px"><i style="width:${q.prog / q.goal * 100}%"></i></div></div>${q.claimed ? '<span class="tag">Done</span>' : q.prog >= q.goal ? `<button class="btn pri sm" data-a="quest" data-v="${i}">Claim</button>` : `<span class="tag">${Math.min(q.prog, q.goal)}/${q.goal}</span>`}</div>`; });
     const open = ACHIEVEMENTS.filter((a) => !p.ach[a.id]).sort((a, b) => (g.stat(b.stat) >= b.n) - (g.stat(a.stat) >= a.n) || g.stat(b.stat) / b.n - g.stat(a.stat) / a.n).slice(0, 4);
-    h += '<div class="sec">Achievements</div>';
+    h += '</div><div><div class="sec">Achievements</div>';
     for (const a of open) { const v = g.stat(a.stat), ok = v >= a.n; h += `<div class="card"><div class="g"><h3>${a.name}</h3><div class="bar" style="margin-top:6px"><i style="width:${Math.min(1, v / a.n) * 100}%"></i></div></div>${ok ? `<button class="btn pri sm" data-a="ach" data-v="${a.id}">Claim</button>` : `<span class="tag">${fmt(Math.min(v, a.n))}/${fmt(a.n)}</span>`}</div>`; }
+    h += '</div></div>';
     return `<div class="ph"><h2>Quests</h2></div><div class="pb">${h}</div>`;
   }
   a_quest(v) { if (G.game.claimQuest(+v)) G.audio.ui('coin'); this.afterReward(); }
@@ -131,16 +132,18 @@ export class UI {
   p_settings() {
     const s = G.settings, q = G.r3.quality;
     const sl = (k, label, min, max, step, pct) => `<div class="sl"><span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${s[k]}" data-set="${k}"><b>${pct ? Math.round(s[k] * 100) + '%' : s[k] + '°'}</b></div>`;
-    return `<div class="ph"><div><h2>Settings</h2></div></div><div class="pb">
-      <div class="sec">Graphics</div><div class="sl"><span>Quality</span><div class="seg">${['Low', 'Medium', 'High', 'Ultra'].map((n, i) => `<button class="${q === i ? 'on' : ''}" data-a="quality" data-v="${i}">${n}</button>`).join('')}</div><b></b></div>
+    const sens = Input.touch ? 'Look sensitivity' : 'Mouse sensitivity';
+    return `<div class="ph"><div><h2>Settings</h2></div></div><div class="pb"><div class="scols"><div>
+      <div class="sec">Graphics</div><div class="sl"><span>Quality</span><div class="seg">${['Low', 'Med', 'High', 'Ultra'].map((n, i) => `<button class="${q === i ? 'on' : ''}" data-a="quality" data-v="${i}">${n}</button>`).join('')}</div><b></b></div>
       ${sl('fov', 'Field of view', 55, 95, 1, false)}
       <div class="sl"><span>Show FPS</span><div class="seg"><button class="${s.showFps ? 'on' : ''}" data-a="toggle" data-v="showFps">${s.showFps ? 'On' : 'Off'}</button></div><b></b></div>
-      <div class="sec">Audio</div>${sl('master', 'Master volume', 0, 1, 0.01, true)}${sl('music', 'Music', 0, 1, 0.01, true)}${sl('sfx', 'Effects', 0, 1, 0.01, true)}
-      <div class="sec">Controls</div>${sl('sens', 'Mouse sensitivity', 0.2, 3, 0.01, true)}
+      <div class="sec">Controls</div>${sl('sens', sens, 0.2, 3, 0.01, true)}
       <div class="sl"><span>Invert Y</span><div class="seg"><button class="${s.invertY ? 'on' : ''}" data-a="toggle" data-v="invertY">${s.invertY ? 'On' : 'Off'}</button></div><b></b></div>
-      <p class="brief"><b>WASD</b> move · <b>Shift</b> sprint (scoped: hold breath) · <b>C / Ctrl</b> crouch (while sprinting: slide) · <b>Space</b> jump / mantle · <b>Q / E</b> lean · <b>LMB</b> fire · <b>RMB</b> aim · <b>R</b> reload · <b>1 2 3 / wheel</b> weapons · <b>G</b> grenade (hold to cook) · <b>V</b> melee strike · <b>F</b> end raid · <b>Esc</b> pause</p>
+      </div><div>
+      <div class="sec">Audio</div>${sl('master', 'Master volume', 0, 1, 0.01, true)}${sl('music', 'Music', 0, 1, 0.01, true)}${sl('sfx', 'Effects', 0, 1, 0.01, true)}
+      ${Input.touch ? '' : `<p class="brief keys"><b>WASD</b> move · <b>Shift</b> sprint (scoped: hold breath) · <b>C / Ctrl</b> crouch (while sprinting: slide) · <b>Space</b> jump / mantle · <b>Q / E</b> lean · <b>LMB</b> fire · <b>RMB</b> aim · <b>R</b> reload · <b>1 2 3 / wheel</b> weapons · <b>G</b> grenade (hold to cook) · <b>V</b> melee strike · <b>F</b> end raid · <b>Esc</b> pause</p>`}
       <div class="sec">Clan colour</div><div class="row">${CLAN_COLORS.map((c, i) => `<button class="chip" style="background:${hex(c)};width:26px;height:26px;${G.profile.color === i ? 'outline:2px solid #fff' : ''}" data-a="color" data-v="${i}"></button>`).join('')}</div>
-      <div class="sec">Save</div><div class="row"><button class="btn sm" data-a="resetask">Reset all progress</button></div></div>`;
+      <div class="sec">Save</div><div class="row"><button class="btn sm" data-a="resetask">Reset all progress</button></div></div></div></div>`;
   }
   a_quality(v) { G.settings.quality = +v; G.setQuality(+v); G.game.save(); this.renderPanel(); }
   a_toggle(v) { G.settings[v] = !G.settings[v]; G.applySettings(); G.game.save(); if (this.modalKind === 'pause') this.showPause(true); else this.renderPanel(); }
@@ -174,8 +177,8 @@ export class UI {
   showPause(keep) {
     const m = G.mode, s = G.settings, build = G.build.active;
     const sl = (k, label, min, max, step, pct) => `<div class="sl"><span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${s[k]}" data-set="${k}"><b>${pct ? Math.round(s[k] * 100) + '%' : s[k] + '°'}</b></div>`;
-    this.openModal(`<div class="mbox"><div class="ph"><h2>${build ? 'Builder' : 'Paused'}</h2><p>${build ? 'Hollowmere' : m && m.cfg.title ? m.cfg.title : ''}</p></div><div class="pb">
-      ${sl('sens', 'Mouse sensitivity', 0.2, 3, 0.01, true)}${sl('fov', 'Field of view', 55, 95, 1, false)}${sl('master', 'Master volume', 0, 1, 0.01, true)}${sl('music', 'Music', 0, 1, 0.01, true)}
+    this.openModal(`<div class="mbox"><div class="ph"><h2>${build ? 'Builder' : 'Paused'}</h2><p>${build ? 'Hollowmere' : m && m.cfg.title ? m.cfg.title : ''}</p></div><div class="pb pgrid">
+      ${sl('sens', Input.touch ? 'Look sensitivity' : 'Mouse sensitivity', 0.2, 3, 0.01, true)}${sl('fov', 'Field of view', 55, 95, 1, false)}${sl('master', 'Master volume', 0, 1, 0.01, true)}${sl('music', 'Music', 0, 1, 0.01, true)}
       <div class="sl"><span>Quality</span><div class="seg">${['Low', 'Med', 'High', 'Ultra'].map((n, i) => `<button class="${G.r3.quality === i ? 'on' : ''}" data-a="pquality" data-v="${i}">${n}</button>`).join('')}</div><b></b></div>
       <div class="sl"><span>Invert Y</span><div class="seg"><button class="${s.invertY ? 'on' : ''}" data-a="toggle" data-v="invertY">${s.invertY ? 'On' : 'Off'}</button></div><b></b></div></div>
       <div class="pf">${build ? (G.build.ctx && G.build.ctx.match ? '<button class="btn" data-a="quit">Leave match</button>' : '<button class="btn" data-a="testdef">Test defences</button><button class="btn" data-a="quit">Save &amp; exit</button>') : m && m.kind === 'pvp' ? '<button class="btn" data-a="quit">Leave match</button>' : `<button class="btn" data-a="quit">${m && m.kind === 'defend' ? 'End defence' : 'Abandon mission'}</button><button class="btn" data-a="restart">Restart</button>`}<button class="btn pri" data-a="resume">Resume</button></div></div>`, 'pause');
@@ -200,7 +203,7 @@ export class UI {
     const title = pvp ? (res.win ? 'VICTORY' : 'DEFEAT') : res.kind === 'defend' ? (res.waves > 0 ? 'VILLAGE HELD' : 'OVERRUN') : (res.win ? 'MISSION COMPLETE' : 'MISSION FAILED');
     const sub = pvp ? `${TEAM_NAMES[m.myTeam]} ${res.score[0]} : ${res.score[1]} ${TEAM_NAMES[1 - m.myTeam]}` : res.kind === 'defend' ? `${res.waves} wave${res.waves === 1 ? '' : 's'} repelled` : m.cfg.title;
     let h = `<div class="big ${res.win ? 'win' : 'lose'}">${title}</div><p class="rsub">${sub}</p>`;
-    if (pvp) h += `<div class="sboard">${res.rows.map((r) => `<div class="${r.me ? 'me' : ''}" style="border-left-color:${r.team === 0 ? '#4aa8ff' : '#ff5a47'}"><span>${r.name}${r.human ? '' : ' <small>bot</small>'}</span><b>${r.k}</b><b>${r.d}</b></div>`).join('')}</div>`;
+    if (pvp) h += `<div class="sboard" style="--n:${Math.max(1, res.rows.filter((r) => r.team === 0).length, res.rows.filter((r) => r.team === 1).length)}">${res.rows.map((r) => `<div class="${r.me ? 'me' : ''}" style="border-left-color:${r.team === 0 ? '#4aa8ff' : '#ff5a47'}"><span>${r.name}${r.human ? '' : ' <small>bot</small>'}</span><b>${r.k}</b><b>${r.d}</b></div>`).join('')}</div>`;
     else h += `<div class="bigstars">${[0, 1, 2].map((i) => i < res.stars ? '<span>★</span>' : '<i>★</i>').join('')}</div>`;
     h += `<div class="kv"><div><b>${s.kills}</b>Kills</div><div><b>${s.headshots}</b>Headshots</div><div><b>${fmt(s.bricks)}</b>Bricks</div><div><b>${fmtTime(res.time)}</b>Time</div></div>`;
     h += `<div class="rw" id="res-rw">${rewardHtml({ gold: rw.gold, wood: rw.wood, stone: rw.stone, iron: rw.iron, ember: rw.ember, trophies: rw.trophies })}</div>`;
@@ -249,9 +252,9 @@ export class UI {
     const b = G.build, ctx = b.ctx, match = !!(ctx && ctx.match), lvl = ctx.hall();
     const pts = (c) => Math.round((c.wood || 0) + (c.stone || 0) + (c.iron || 0) * 2 + (c.gold || 0) * 0.5);
     const price = (c) => match ? `<span class="cost"><span class="${pts(c) > G.mode.buildPts ? 'no' : ''}">${pts(c)} pts</span></span>` : costHtml(c);
-    let cats = b.cats().map((c, i) => `<button class="${i === b.cat ? 'on' : ''}" data-a="bcat" data-v="${i}">${i + 1} ${c.name}</button>`).join('');
-    if (!match) { const hc = lvl < 5 ? bpCost('hall', lvl + 1) : null; cats += `<span class="sp"></span>${hc ? `<button data-a="bhall">Hall → LV ${lvl + 1} ${costHtml(hc)}</button>` : ''}<button data-a="bundo">Undo</button><button data-a="btest">Test</button><button data-a="bexit" style="background:var(--em);color:#160b02">Save &amp; Exit</button>`; }
-    else cats += '<span class="sp"></span><button data-a="bundo">Undo</button>';
+    let cats = b.cats().map((c, i) => `<button class="${i === b.cat ? 'on' : ''}" data-a="bcat" data-v="${i}"><span class="kb">${i + 1}</span>${c.name}</button>`).join('');
+    if (!match) { const hc = lvl < 5 ? bpCost('hall', lvl + 1) : null; cats += `<span class="sp"></span>${hc ? `<button data-a="bhall">Hall ${lvl + 1} ${costHtml(hc)}</button>` : ''}<button class="kb" data-a="bundo">Undo</button><button data-a="btest">Test</button><button data-a="bexit" style="background:var(--em);color:#160b02">${Input.touch ? 'Exit' : 'Save &amp; Exit'}</button>`; }
+    else cats += '<span class="sp"></span><button class="kb" data-a="bundo">Undo</button>';
     $('b-cats').innerHTML = cats;
     const items = b.items();
     $('b-items').innerHTML = items.map((it, i) => {
@@ -269,7 +272,7 @@ export class UI {
     h += `<div class="why" id="b-why"></div>`;
     $('b-info').innerHTML = h; this.lastWhy = null;
   }
-  buildTick() { const b = G.build, why = Input.locked ? (b.valid ? '' : b.reason) : 'Click the view to grab the camera'; if (why !== this.lastWhy) { this.lastWhy = why; const e = $('b-why'); if (e) e.textContent = why; } }
+  buildTick() { const b = G.build, why = Input.locked || Input.touch ? (b.valid ? '' : b.reason) : 'Click the view to grab the camera'; if (why !== this.lastWhy) { this.lastWhy = why; const e = $('b-why'); if (e) e.textContent = why; } }
   a_bcat(v) { G.build.cat = +v; G.build.sel = 0; G.build.ghostKey = ''; this.buildRefresh(); }
   a_bitem(v) { G.build.sel = +v; G.build.ghostKey = ''; this.buildRefresh(); Input.wantLock = true; Input.lock(); }
   a_bhall() { if (G.build.upgradeHall()) { this.refreshTop(); this.buildRefresh(); } else if (G.hud) G.hud.toast('Not enough resources', 1.5); }

@@ -32,7 +32,7 @@ export class HUD {
   sniperWarn(a, f) { this.warnT = 0.2; const w = $('warn'); w.textContent = '◆ MARKSMAN AIMING ◆'; w.style.opacity = 0.4 + f * 0.6; }
   // short shouted callouts floating over a soldier's head ("RELOADING!", "FRAG OUT!")
   bark(a, text) { if (this.el.classList.contains('hidden')) return; const p = G.player; if (!p || Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) > 45) return; const el = document.createElement('i'); el.className = 'bark' + (a.team === 0 ? ' ally' : ''); el.textContent = text; this.markers.appendChild(el); this.barks.push({ a, el, t: 1.7 }); if (this.barks.length > 4) this.barks.shift().el.remove(); }
-  hint(text, dur = 6) { this.hintEl.textContent = text; this.hintEl.style.opacity = 1; this.hintT = dur; }
+  hint(text, dur = 6) { this.hintEl.textContent = text; this.hintEl.style.opacity = text ? 1 : 0; this.hintT = text ? dur : 0; }
   prompt(html) { const p = $('prompt'); if (html !== this.promptText) { this.promptText = html; p.innerHTML = html; p.style.display = html ? 'block' : 'none'; } }
 
   update(dt) {

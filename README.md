@@ -121,7 +121,7 @@ Any Node host works (Fly.io, Render, Railway, a VPS). Browsers on HTTPS pages ne
 * **Graphics** — physically based shading, HDR + filmic tone mapping, bloom, soft shadows, procedural PBR brick/stone/wood
   surfaces, volumetric-style fog and a dynamic sky. It is not photorealistic in the way a console game with scanned assets is;
   everything is generated from code so the whole game is a ~1 MB download (~290 KB compressed).
-* **Phones and tablets** get touch controls: a floating move stick on the left, drag anywhere on the right to look (with light aim assist), and buttons for fire, aim, jump, crouch, reload, grenade, melee and weapon swap. Build mode has its own place / remove / rotate / fly buttons. Landscape only.
+* **Phones and tablets** get touch controls: a floating move stick on the left, drag anywhere on the right to look (with light aim assist), and buttons for fire, aim, jump, crouch, reload, grenade, melee and weapon swap. Build mode has its own place / remove / rotate / up / down / undo buttons, the move stick flies the camera, and the item bar is tapped directly. On phone-sized screens the menu becomes a side rail with compact two-column panels and every dialog fits without scrolling. Landscape only.
 
 ## Code map
 

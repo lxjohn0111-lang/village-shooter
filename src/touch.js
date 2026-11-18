@@ -47,6 +47,8 @@ export class Touch {
     window.addEventListener('pointermove', (e) => this.move(e), opt);
     window.addEventListener('pointerup', (e) => this.up(e), opt);
     window.addEventListener('pointercancel', (e) => this.up(e), opt);
+    this.el.addEventListener('lostpointercapture', (e) => this.up(e));
+    window.addEventListener('blur', () => this.reset());
     this.el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   show(mode) {          // '' | 'play' | 'build'
@@ -56,7 +58,7 @@ export class Touch {
   }
   reset() {
     for (const p of this.ptrs.values()) if (p.k) this.key(p.k, false);
-    this.ptrs.clear(); Input.ax = Input.ay = 0; this.stick.style.display = 'none';
+    this.ptrs.clear(); this.stickId = null; Input.ax = Input.ay = 0; this.stick.style.display = 'none';   // a finger held through a pause/death/menu must not leave the stick claimed
     Input.buttons[0] = false; if (this.aimOn) { this.aimOn = false; Input.buttons[2] = false; }
     if (this.crouchOn) { this.crouchOn = false; Input.keys.KeyC = false; }
   }
@@ -84,9 +86,10 @@ export class Touch {
     if (G.audio) G.audio.resume();
     e.preventDefault();
     const btn = e.target.closest && e.target.closest('.t-btn'), W = innerWidth;
+    if (this.stickId != null && !this.ptrs.has(this.stickId)) this.stickId = null;   // its pointerup was lost (system gesture, layer hidden)
     const p = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, k: null, look: false, stick: false };
     if (btn) { p.k = btn.dataset.k; p.btn = btn; p.look = p.k === 'fire' || p.k === 'place'; this.key(p.k, true, btn); }
-    else if (e.clientX < W * 0.42 && !this.stickId) {                  // floating move stick
+    else if (e.clientX < W * 0.42 && this.stickId == null) {                  // floating move stick
       p.stick = true; this.stickId = e.pointerId; this.stick.style.display = 'block';
       this.stick.style.left = e.clientX + 'px'; this.stick.style.top = e.clientY + 'px'; this.knob.style.transform = 'translate(-50%,-50%)';
     } else p.look = true;
@@ -114,8 +117,11 @@ export class Touch {
     }
   }
   update() {
-    const want = Input.touch && Input.locked && !G.busy ? (G.state === 'play' ? 'play' : G.state === 'build' ? 'build' : '') : '';
+    // the Build & Battle build phase runs inside a match (state 'play') but needs the build buttons
+    const building = G.build && G.build.active && (G.state === 'build' || G.state === 'play');
+    const want = Input.touch && Input.locked && !G.busy ? (building ? 'build' : G.state === 'play' ? 'play' : '') : '';
     this.show(want);
+    const pvp = !!(G.mode && G.mode.kind === 'pvp'); if (pvp !== this.pvp) { this.pvp = pvp; this.el.classList.toggle('pvp', pvp); }
     if (want === 'play' && G.weapons) this.el.querySelector('.t-aim').classList.toggle('dis', !!G.weapons.def.melee);
   }
 }

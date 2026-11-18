@@ -255,7 +255,7 @@ export class BuildMode {
     else {
       if (locked) { this.yaw -= inp.mdx * 0.0022 * (G.settings.sens || 1); this.pitch = clamp(this.pitch - inp.mdy * 0.0022 * (G.settings.sens || 1), -1.5, 1.5); }
       let ix = 0, iy = 0, iz = 0;
-      if (locked) { if (inp.keys.KeyW) iz -= 1; if (inp.keys.KeyS) iz += 1; if (inp.keys.KeyA) ix -= 1; if (inp.keys.KeyD) ix += 1; if (inp.keys.Space) iy += 1; if (inp.keys.ControlLeft || inp.keys.KeyC) iy -= 1; }
+      if (locked) { if (inp.keys.KeyW) iz -= 1; if (inp.keys.KeyS) iz += 1; if (inp.keys.KeyA) ix -= 1; if (inp.keys.KeyD) ix += 1; if (inp.keys.Space) iy += 1; if (inp.keys.ControlLeft || inp.keys.KeyC) iy -= 1; if (inp.ax || inp.ay) { ix += inp.ax; iz += inp.ay; } }
       const sp = inp.keys.ShiftLeft ? 26 : 11, s = Math.sin(this.yaw), c = Math.cos(this.yaw), cp = Math.cos(this.pitch);
       const tx = (ix * c + iz * s * cp) * sp, tz = (-ix * s + iz * c * cp) * sp, ty = (iy - iz * Math.sin(this.pitch) * -1 * 0 + (iz < 0 ? Math.sin(this.pitch) : iz > 0 ? -Math.sin(this.pitch) : 0)) * sp;
       this.vel.x = damp(this.vel.x, tx, 10, dt); this.vel.y = damp(this.vel.y, ty, 10, dt); this.vel.z = damp(this.vel.z, tz, 10, dt);

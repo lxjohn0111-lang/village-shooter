@@ -136,6 +136,7 @@ async function startMission(cfg, mission) {
   G.player.applyCamera(G.r3.camera, G.settings.fov);
   Input.wantLock = true; Input.lock();
   SDK.gameplayStart();
+  G.hud.hint('', 0);
   if (!mission) G.hud.banner(cfg.title || '', '#ffffff', cfg.sub || '');
   if (cfg.storyDef && cfg.storyDef.id === 's1' && !G.profile.story.s1) G.hud.hint(Input.touch ? 'Left side: move  ·  Right side: look  ·  FIRE to shoot' : 'WASD move  ·  Mouse aim  ·  Click to fire  ·  Right-click to aim', 9);
   await fade(false);
@@ -170,7 +171,7 @@ async function enterBuild() {
   G.build.enter(profileCtx()); G.state = 'build'; G.ui.showBuild(true);
   Input.wantLock = true; Input.lock(); SDK.gameplayStart();
   await fade(false); G.busy = false;
-  if (!G.profile.hints.build) { G.profile.hints.build = 1; G.game.save(); G.hud.toast('Pick an item below, aim, and click to build', 4); }
+  if (!G.profile.hints.build) { G.profile.hints.build = 1; G.game.save(); G.hud.toast(Input.touch ? 'Pick an item below, aim, tap PLACE' : 'Pick an item below, aim, and click to build', 4); }
 }
 function exitBuild(silent) { if (!G.build.active) return; G.build.exit(); G.ui.showBuild(false); Input.unlock(); SDK.gameplayStop(); if (!silent) toMenu(false, 'home'); }
 function afterAd(fn) { SDK.gameplayStop(); SDK.midgame().then(fn); }
