@@ -3,9 +3,11 @@
 import { G } from './util.js';
 import { Input } from './input.js';
 
-export function isTouchDevice() {
+// deviceType: CrazyGames' own detection ("desktop" | "tablet" | "mobile") when the SDK is live — preferred over guessing
+export function isTouchDevice(deviceType) {
   const q = new URLSearchParams(location.search);
   if (q.has('touch')) return q.get('touch') !== '0';
+  if (deviceType) return deviceType !== 'desktop';
   return ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.matchMedia && matchMedia('(pointer: coarse)').matches;
 }
 

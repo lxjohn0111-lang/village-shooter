@@ -1,0 +1,12 @@
+{
+  "name": "emberhold",
+  "private": true,
+  "type": "module",
+  "description": "Emberhold: Village Wars — browser FPS. Build tooling only; the game itself needs no build to run locally.",
+  "scripts": {
+    "build:crazygames": "node tools/build-crazygames.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

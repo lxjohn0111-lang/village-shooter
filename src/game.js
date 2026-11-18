@@ -44,17 +44,27 @@ export class Game {
 
   load() {
     let p = null;
-    try { const s = SDK.getItem(SAVE_KEY); if (s) p = JSON.parse(s); } catch (e) { p = null; }
+    let raw = SDK.getItem(SAVE_KEY);
+    // first launch with the Data module: carry over a save an earlier build kept in localStorage
+    if (!raw && SDK.storage() === 'data') { const old = SDK.legacyItem(SAVE_KEY); if (old) { raw = old; this.migrated = true; } }
+    try { if (raw) p = JSON.parse(raw); } catch (e) { p = null; }
     const d = defaultProfile();
-    if (!p || p.v !== 1 || !p.village || !p.village.b) { p = d; this.fresh = true; }
+    if (!p || p.v !== 1 || !p.village || !p.village.b) { p = d; this.fresh = true; this.migrated = false; }   // keep an unreadable old save untouched
     else { for (const k in d) if (p[k] === undefined) p[k] = d[k]; for (const k in d.res) if (typeof p.res[k] !== 'number' || !isFinite(p.res[k])) p.res[k] = d.res[k]; for (const k in d.settings) if (p.settings[k] === undefined) p.settings[k] = d.settings[k]; p.village.b = p.village.b.filter((b) => BP[b.t]); if (!p.village.f) p.village.f = []; }
     this.p = G.profile = p; G.settings = p.settings;
     if (!p.rivals.length) this.rollRivals();
     this.rollQuests();
+    if (this.migrated) this.flush();          // move the old local save into the Data module right away
     return p;
   }
   save(now) { this.dirty = true; if (now) this.flush(); }
-  flush() { if (!this.p) return; this.p.lastSeen = Date.now(); try { SDK.setItem(SAVE_KEY, JSON.stringify(this.p)); } catch (e) { /* ignore */ } this.dirty = false; }
+  // the Data module debounces writes itself (1–30 s), so writing the whole profile every few seconds is cheap
+  flush() {
+    if (!this.p) return; this.p.lastSeen = Date.now();
+    let json = JSON.stringify(this.p);
+    if (json.length > 900000) { this.p.log = []; json = JSON.stringify(this.p); console.warn('[save] profile is ' + Math.round(json.length / 1024) + ' KB, close to the 1 MB Data module limit'); }
+    if (SDK.setItem(SAVE_KEY, json)) { this.dirty = false; if (this.migrated) { SDK.dropLegacy(SAVE_KEY); this.migrated = false; } }
+  }
   reset() { this.p = G.profile = defaultProfile(); G.settings = this.p.settings; this.rollRivals(); this.rollQuests(); this.flush(); }
   stat(k) { return this.p.stats[k] || 0; }
 

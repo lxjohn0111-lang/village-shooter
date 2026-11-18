@@ -14,12 +14,40 @@ Any static file server works (ES modules need `http://`, not `file://`):
 python3 -m http.server 8080
 ```
 
-Then open `http://localhost:8080/`. Outside CrazyGames the SDK is skipped automatically: saves go to `localStorage` and no ads are requested.
+Then open `http://localhost:8080/`. On `localhost` the CrazyGames SDK runs in its `local` test mode (fake ads, Data module backed by the browser).
+On any other domain outside CrazyGames the SDK is disabled: saves go to plain `localStorage` and no ads are requested.
 
 ## Upload to CrazyGames
 
-Zip the repository contents so that `index.html` is at the root of the archive (`index.html`, `style.css`, `src/`, `lib/`) and upload it
-as an HTML5 game in the CrazyGames developer portal. Total size is about 2.5 MB. Use the portal's QA tool to check the SDK events below.
+The ready-to-upload build is committed in **`crazygames-upload/`** (and the same files zipped as **`crazygames-upload.zip`**, `index.html` at the root):
+
+| File | What it is |
+| --- | --- |
+| `index.html` | Page shell; loads the CrazyGames SDK v3 and `game.js` (relative paths only) |
+| `game.js` | All game code plus three.js, bundled and minified (~1 MB, ~290 KB zipped) |
+| `style.css` | UI styles |
+| `licenses.txt` | three.js MIT licence |
+
+Rebuild it after changing the source:
+
+```bash
+npm install
+npm run build:crazygames
+```
+
+In the CrazyGames developer portal:
+
+1. Upload `crazygames-upload.zip` (or the four files) as an **HTML5** game.
+2. **Progress Save: "Yes, using the Data Module from the CrazyGames SDK".** The game saves only through the Data module on CrazyGames; with the toggle off the SDK throws `dataModuleDisabled` and progress falls back to the browser only.
+3. Orientation: **landscape**. Platforms: desktop and mobile (touch controls are switched on from the SDK's device type).
+4. Check `gameplayStart/Stop`, ads and saving with the portal's QA tool.
+
+### Progress saving (Data module)
+
+The whole profile (village, resources, campaign, bonds, weapons, settings) is one JSON value under the key `emberhold_save_v1`, written with `SDK.data.setItem` a few seconds after anything changes (the SDK itself debounces 1–30 s).
+Guests keep it in the SDK's local storage and it moves to their account when they log in; logged-in players get it synced across devices.
+A save left in plain `localStorage` by an older build is copied into the Data module on first launch and then removed.
+The profile stays far below the 1 MB limit; the history log is dropped if it ever gets close.
 
 ## Game modes
 
@@ -81,7 +109,8 @@ Any Node host works (Fly.io, Render, Railway, a VPS). Browsers on HTTPS pages ne
 | `game.happytime` | Every mission win. |
 | `ad.requestAd('midgame')` | Leaving the results screen. Audio is muted and the simulation frozen while an ad is open. |
 | `ad.requestAd('rewarded')` | Opt-in only: revive, double spoils, supply caravan. Rewards are granted only on `adFinished`. |
-| `data.getItem / setItem` | Cloud save of the whole profile (falls back to `localStorage`). |
+| `data.getItem / setItem` | The only save on CrazyGames (guests and logged-in players); one-time migration of older `localStorage` saves. Plain `localStorage` only off-platform or if the Data module is disabled. |
+| `user.systemInfo.device.type` | Turns touch controls on for `mobile` / `tablet`. |
 | `user.getUser`, auth listener | Player name in the top bar. |
 | `game.settings.muteAudio` + settings listener | Respects the portal mute toggle. |
 
@@ -91,13 +120,14 @@ Any Node host works (Fly.io, Render, Railway, a VPS). Browsers on HTTPS pages ne
   Hits are decided by whoever fires and bots run on the host's machine, so there is no anti-cheat; it is built for friendly play.
 * **Graphics** — physically based shading, HDR + filmic tone mapping, bloom, soft shadows, procedural PBR brick/stone/wood
   surfaces, volumetric-style fog and a dynamic sky. It is not photorealistic in the way a console game with scanned assets is;
-  everything is generated from code so the whole game stays a ~2.5 MB download.
+  everything is generated from code so the whole game is a ~1 MB download (~290 KB compressed).
 * **Phones and tablets** get touch controls: a floating move stick on the left, drag anywhere on the right to look (with light aim assist), and buttons for fire, aim, jump, crouch, reload, grenade, melee and weapon swap. Build mode has its own place / remove / rotate / fly buttons. Landscape only.
 
 ## Code map
 
 ```
 index.html, style.css   page shell and UI styles
+crazygames-upload/      built upload (tools/build-crazygames.mjs)
 lib/                    three.js r187 (MIT) + post-processing addons
 src/main.js             boot, main loop, state machine
 src/world.js            brick grid, instanced rendering, surface shader, damage, structural collapse, debris

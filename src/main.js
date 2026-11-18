@@ -39,6 +39,8 @@ async function boot() {
   G.audio = new AudioSys();
   await SDK.init();
   SDK.loadingStart();
+  // debug URL switches only work off CrazyGames
+  if (SDK.env === 'crazygames') { G.godMode = false; G.autoplay = false; }
   progress(0.15, 'Opening the ledgers…');
   G.game = new Game(); G.game.load();
   await wait(20);
@@ -46,7 +48,7 @@ async function boot() {
   G.noiseTex = makeNoiseTexture();
   const canvas = $('c');
   G.r3 = new Renderer3D(canvas);
-  const touch = isTouchDevice();
+  const touch = isTouchDevice(SDK.deviceType());
   let q = G.settings.quality; if (q < 0) { q = touch ? ((navigator.deviceMemory || 4) >= 6 ? 1 : 0) : 2; G.autoQuality = true; }
   if (Q.has('q')) { q = +Q.get('q'); G.autoQuality = false; }
   G.r3.quality = q; G.r3.buildComposer(); G.r3.resize();
@@ -64,7 +66,7 @@ async function boot() {
   G.player = new Player(); G.weapons = new WeaponSys(G.r3.camera); G.actors = new Actors();
   G.build = new BuildMode(); G.hud = new HUD(); G.ui = new UI();
   Input.init(canvas);
-  if (touch) { Input.touch = true; Input.noLock = true; document.body.classList.add('touch'); G.touch = new Touch(); orientationGuard(); }
+  if (touch) { Input.touch = true; Input.noLock = true; document.body.classList.add('touch'); G.touch = new Touch(); if (SDK.env !== 'crazygames') orientationGuard(); }
   G.onPieceGone = (...a) => { if (G.mode && G.state === 'play') G.mode.onPieceGone(...a); };
   G.onCollapse = (...a) => { if (G.mode && G.state === 'play') G.mode.onCollapse(...a); };
   G.onPointerUnlock = onUnlock; G.onKey = onKey; G.onMissionEnd = onMissionEnd;
@@ -73,6 +75,8 @@ async function boot() {
   window.addEventListener('resize', () => G.r3.resize());
   document.addEventListener('visibilitychange', () => { if (document.hidden) { G.game.flush(); if (G.audio.ctx && G.audio.ctx.state === 'running') G.audio.ctx.suspend(); if (G.state === 'play' && Input.locked) Input.unlock(); } else if (G.audio.ctx) G.audio.ctx.resume(); });
   window.addEventListener('pagehide', () => G.game.flush());
+  // iOS suspends audio when the app is interrupted; it may only be resumed from a user gesture
+  for (const ev of ['touchend', 'click']) document.addEventListener(ev, () => G.audio.resume(), { passive: true });
   progress(0.88, 'Raising Hollowmere…');
   await wait(20);
   loadMenuScene();
@@ -83,7 +87,7 @@ async function boot() {
   $('loading').classList.add('out'); setTimeout(() => $('loading').classList.add('hidden'), 700);
   requestAnimationFrame(frame);
   window.READY = true;
-  const test = Q.get('test');
+  const test = SDK.env === 'crazygames' ? null : Q.get('test');
   if (test) { runTest(test); return; }
   const report = G.game.offline();
   if (!G.profile.story.s1 && !G.profile.seenPrologue) {
